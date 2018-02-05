@@ -4,7 +4,10 @@ import re
 #import LatLon #latlon är typ trasigt. no kidding.
 from datetime import datetime
 
-gmaps = googlemaps.Client(key='AIzaSyBTWamksTAzYtq_oUaz8qaR9rLGYPGWWcc')
+with open('google_api_key.txt', 'r') as f:
+    google_api_key=f.read().replace('\n', '')
+    
+gmaps = googlemaps.Client(key=google_api_key)
 # All locations will be in latitude,longitude format.
 
 def parseResult(directions_result):
