@@ -1,9 +1,9 @@
 far = 1000;
-lidarResH = degtorad(0.16);
-lidarResV = degtorad(1.33);
+lidarResH = 0.16;
+lidarResV = 1.33;
 cameraWidth = 2000;
 cameraHeight = 1000;
-fovH = degtorad(90);
+fovH = 90;
 
 % Decode image data to depth map
 head = DecodeDepth(imread('head/image_00001.png'),far);
@@ -13,7 +13,7 @@ right = DecodeDepth(imread('right/image_00001.png'),far);
 
 [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,cameraWidth,cameraHeight,fovH);
 
-scatter(pixels(:,1),pixels(:,2));
+%scatter(pixels(:,1),pixels(:,3));
 
 [xH,yH,zH] = GetCoordinates(head,angles,pixels);
 [xT,yT,zT] = GetCoordinates(tail,angles,pixels);

@@ -1,4 +1,4 @@
-function [x,y,z] = GetCoordinates(image,angles, pixels)
+function [x,y,z] = GetCoordinates(imageA,angles, pixels)
     pixels = uint32(pixels);
     nPoints = length(pixels);
     c = zeros(nPoints,3);
@@ -7,10 +7,7 @@ function [x,y,z] = GetCoordinates(image,angles, pixels)
        for i = 1:nPoints
            v = angles(i,1);
            h = angles(i,2);
-           if i > length(pixels)
-               disp('hej')
-           end
-           r = image(pixels(i,2),pixels(i,1));
+           r = imageA(pixels(i,3),pixels(i,1));
            
            [x,y,z] = sph2cart(h,v,r);
            

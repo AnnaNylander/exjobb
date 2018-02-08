@@ -34,7 +34,7 @@ function [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHe
     figure
     for stepV = 1:nAnglesV
         lineH = line*Rotx((stepV-1)*lidarResV); % Rotate up
-        vectarrow(lineH(1),lineH(2));
+        
         angleV = startAngleV + (stepV-1)*lidarResV;
         lineH = lineH*Rotz(-startAngleH); % Rotate to horizontal start position
 
@@ -49,15 +49,13 @@ function [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHe
         end
     end
     
-    scatter3(pixels(:,1),pixels(:,2),pixels(:,3))
     
-    a = 1;
     %pixels(:,2) = int32(pixels(:,1)) + 1;
-    pixels(:,1) = int32(pixels(:,1)) + imgWidth/2 + 1;
-    pixels(:,2) = int32(pixels(:,2)) + imgHeight/2 + 1;
+    %pixels(:,1) = int32(pixels(:,1)) + imgWidth/2 + 1;
+    %pixels(:,3) = int32(pixels(:,3)) + imgHeight/2 + 1;
     
     %scatter(angles(:,1),angles(:,2));
+    scatter3(pixels(:,1),pixels(:,2),pixels(:,3))
     
-    a = 1;
 end
 
