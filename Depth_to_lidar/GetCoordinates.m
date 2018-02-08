@@ -5,8 +5,8 @@ function [x,y,z] = GetCoordinates(imageA,angles, pixels)
     
     %for i = 1:nVertical
        for i = 1:nPoints
-           v = angles(i,1);
-           h = angles(i,2);
+           v = degtorad(angles(i,1));
+           h = degtorad(angles(i,2));
            r = imageA(pixels(i,3),pixels(i,1));
            
            [x,y,z] = sph2cart(h,v,r);

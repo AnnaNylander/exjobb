@@ -66,12 +66,12 @@ set(gca,'Color','k'); % Set background color
 
 
 
-img = zeros(cameraHeight,cameraWidth);
+%img = zeros(cameraHeight,cameraWidth);
 
-for i=1:length(distanceH)
-    for j=1:length(distanceV)
-        img(distanceV(j),distanceH(i)) = head(distanceV(j),distanceH(i));
-    end
-end
+%for i=1:length(distanceH)
+%    for j=1:length(distanceV)
+%        img(distanceV(j),distanceH(i)) = head(distanceV(j),distanceH(i));
+%    end
+%end
 %subplot(1,2,2)
 %image(img)
