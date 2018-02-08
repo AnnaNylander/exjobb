@@ -4,7 +4,6 @@ lidarResV = degtorad(1.33);
 cameraWidth = 2000;
 cameraHeight = 1000;
 fovH = degtorad(90);
-%centerDistance = cameraWidth/(2*tan(fovH/2));
 
 % Decode image data to depth map
 head = DecodeDepth(imread('head/image_00001.png'),far);
@@ -12,18 +11,22 @@ tail = DecodeDepth(imread('tail/image_00001.png'),far);
 left = DecodeDepth(imread('left/image_00001.png'),far);
 right = DecodeDepth(imread('right/image_00001.png'),far);
 
-[distanceV, distanceH, anglesV, anglesH] = GetRelevantPixels(lidarResH,lidarResV,cameraWidth,cameraHeight,fovH);
+[pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,cameraWidth,cameraHeight,fovH);
 
-[xH,yH,zH] = GetCoordinates(head,anglesV,anglesH,distanceV,distanceH);
-[xT,yT,zT] = GetCoordinates(tail,anglesV,anglesH,distanceV,distanceH);
-[xL,yL,zL] = GetCoordinates(left,anglesV,anglesH,distanceV,distanceH);
-[xR,yR,zR] = GetCoordinates(right,anglesV,anglesH,distanceV,distanceH);
+scatter(pixels(:,1),pixels(:,2));
+
+[xH,yH,zH] = GetCoordinates(head,angles,pixels);
+[xT,yT,zT] = GetCoordinates(tail,angles,pixels);
+[xL,yL,zL] = GetCoordinates(left,angles,pixels);
+[xR,yR,zR] = GetCoordinates(right,angles,pixels);
 
 [xT,yT,zT] = ZAxisRotation(xT,yT,zT,degtorad(180));
 [xL,yL,zL] = ZAxisRotation(xL,yL,zL,degtorad(-90));
 [xR,yR,zR] = ZAxisRotation(xR,yR,zR,degtorad(90));
 
-x = 
+x = [xH;xT;xL;xR];
+y = [yH;yT;yL;yR];
+z = [zH;zT;zL;zR];
 
 %c = zeros(length(headV)*length(headH),3);
 %for i = 1:length(headV)
@@ -41,12 +44,14 @@ x =
 %end
 
 figure;
-subplot(1,2,1)
-scatter3(x,y,z,'.');
-set(gca,'Color','k'); % Set background color
-
-subplot(1,2,2)
-scatter3(x2,y2,z2,'.');
+%subplot(1,2,1)
+scatter3(xT,yT,zT,'.');
+hold on
+scatter3(xH,yH,zH,'.');
+hold on
+scatter3(xL,yL,zL,'.');
+hold on
+scatter3(xR,yR,zR,'.');
 set(gca,'Color','k'); % Set background color
 
 %intensity = data(:,4);

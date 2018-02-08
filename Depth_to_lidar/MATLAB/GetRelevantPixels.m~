@@ -1,9 +1,0 @@
-function pixels = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHeight,fovH)
-    
-    centerDistance = imgWidth/(2*tan(fovH/2));
-    fovV = atand();
-    lidarRayAngles = -fovH/2:lidarResH:fovH/2;
-    pixels = tan(lidarRayAngles)*centerDistance;
-    pixels = uint32(pixels + cameraWidth/2) + 1;
-end
-
