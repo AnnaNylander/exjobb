@@ -15,8 +15,8 @@ function [x,y,z] = GetCoordinates(imageA,angles, pixels)
            %c(pointIndex,2) = (1/cos(h))*y;
            %c(pointIndex,3) = z;
            
-           c(i,1) = x;
-           c(i,2) = y;
+           c(i,1) = -(1/cos(pi - h))*x; %-h
+           c(i,2) = (1/sin(pi/2 - h))*y; %pi/2 -h
            c(i,3) = z;
        end
     %end

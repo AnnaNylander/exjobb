@@ -2,9 +2,9 @@ function [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHe
 
     d = imgWidth/(2*tan(degtorad(fovH)/2));
     % Define three points in the image plane
-    p1 = [-imgWidth/2 -d -imgHeight/2];
-    p2 = [-imgWidth/2 -d imgHeight/2];
-    p3 = [0 -d 0];
+    p1 = [-imgWidth/2 d -imgHeight/2];
+    p2 = [-imgWidth/2 d imgHeight/2];
+    p3 = [0 d 0];
 
     % Calculate the image plane normal
     normal = cross(p1-p2, p1-p3);
@@ -12,7 +12,7 @@ function [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHe
 
 
     %------------------------
-    lineP=p2*Rotz(-fovH/2);
+    lineP=p2*Rotz(fovH/2);
     [pixel, check] = plane_line_intersect(normal,p3,lineP,[0 0 0]);
     offset = (imgHeight/2) -pixel(3);
     fakeImgHeight = imgHeight - offset*2;
@@ -30,9 +30,9 @@ function [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHe
 
     % Create line segment to check for intersection with image plane
     lineP1 = [0,0,0];
-    lineP=p1*Rotz(-fovH/2);
+    lineP=p1*Rotz(fovH/2);
     [pixel, check] = plane_line_intersect(normal,p3,lineP,[0 0 0]);
-    lineP2 = [0, -d, pixel(3)]; % p5
+    lineP2 = [0, d, pixel(3)]; % p5
     line = (lineP2 - lineP1);
 
     angles = zeros(nAnglesV*nAnglesH,2);
@@ -42,14 +42,14 @@ function [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHe
 
     figure
     for stepV = 1:nAnglesV
-        lineH = line*Rotx((stepV-1)*lidarResV); % Rotate up
+        lineH = line*Rotx(-(stepV-1)*lidarResV); % Rotate up
         
         angleV = startAngleV + (stepV-1)*lidarResV;
-        lineH = lineH*Rotz(-startAngleH); % Rotate to horizontal start position
+        lineH = lineH*Rotz(startAngleH); % Rotate to horizontal start position
 
         for stepH = 1:nAnglesH
             [pixel, check] = plane_line_intersect(normal,p3,lineH,[0 0 0]);
-            lineH = lineH*Rotz(-lidarResH);
+            lineH = lineH*Rotz(lidarResH);
             angleH = startAngleH + (stepH-1)*lidarResH;
             
             angles(index,:) = [angleV angleH];
