@@ -1,6 +1,8 @@
 #Custom files
 intentions/google_api_key.txt
 intentions/*.csv
+depth_to_lidar/matlab/*.mat
+depth_to_lidar/matlab/*.m~
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
