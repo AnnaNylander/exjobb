@@ -6,10 +6,10 @@ cameraHeight = 1677;    % Height in pixels of depth images
 fovH = 90;              % Horizontal field of view
 
 % Decode image data to depth map
-head = DecodeDepth(imread('../example_images/head/image_00001.png'),far);
-tail = DecodeDepth(imread('../example_images/tail/image_00001.png'),far);
-left = DecodeDepth(imread('../example_images/left/image_00001.png'),far);
-right = DecodeDepth(imread('../example_images/right/image_00001.png'),far);
+head = DecodeDepth(imread('../example_images/head/image_00034.png'),far);
+tail = DecodeDepth(imread('../example_images/tail/image_00034.png'),far);
+left = DecodeDepth(imread('../example_images/left/image_00034.png'),far);
+right = DecodeDepth(imread('../example_images/right/image_00034.png'),far);
 
 % Calculate which pixels that are hit by lidar rays. Also, return lidar ray
 % angles.
@@ -45,3 +45,4 @@ scatter3(xL,yL,zL,'.');
 hold on
 scatter3(xR,yR,zR,'.');
 set(gca,'Color','k');
+daspect([1 1 1]);

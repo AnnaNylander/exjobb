@@ -4,7 +4,7 @@ function [x,y,z] = GetCoordinates(imageA,angles, pixels)
     c = zeros(nPoints,3);
     
    for i = 1:nPoints
-       v = -degtorad(angles(i,1));
+       v = degtorad(angles(i,1));
        h = -degtorad(angles(i,2));
        pixelX = pixels(i,2);
        pixelY = pixels(i,3);

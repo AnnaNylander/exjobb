@@ -30,8 +30,8 @@ def depth_to_point_cloud(imgHead, imgTail, imgLeft, imgRight):
 
     # Rotate points according to the camera directions
     cTail = rotate_z(cTail,180)
-    cLeft = rotate_z(cLeft,90)
-    cRight = rotate_z(cRight,-90)
+    cLeft = rotate_z(cLeft,-90)
+    cRight = rotate_z(cRight,90)
 
     # Concatenate points from all cameras and save as image
     pointCloud = np.concatenate((cHead,cTail,cLeft,cRight),0)
@@ -61,11 +61,11 @@ def get_coordinates(image, angles, pixels):
     """Convert depth map values into corresponding lidar measurements."""
     coordinates = np.zeros((len(angles),3))
 
-    for i in range(len(angles)):
-           v = -np.radians(angles[i,0])
+    for i in range(len(angles)-1):
+           v = np.radians(angles[i,0])
            h = -np.radians(angles[i,1])
-           pixelX = int(pixels[i,0])
-           pixelY = int(pixels[i,1])
+           pixelX = int(pixels[i,0]-1)
+           pixelY = int(pixels[i,1]-1)
            r = image[pixelY,pixelX]
 
            # Correction for differences between lidar and depthmaps measurements

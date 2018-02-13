@@ -64,11 +64,12 @@ function [pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,imgWidth,imgHe
     end
     
     % Shift coordinates to form actual pixel indices
-    pixels(:,2) = int32(imgWidth - (pixels(:,2) + imgWidth/2) + 1);
-    pixels(:,3) = int32(pixels(:,3) + imgHeight/2 + 1);
-    
+    %pixels(:,2) = int32(-imgWidth/2 - (pixels(:,2) + imgWidth/2) + 1);
+    %pixels(:,3) = int32(pixels(:,3) + imgHeight/2 + 1);
+    pixels(:,2) = int32(pixels(:,2) + imgWidth/2);
+    pixels(:,3) = int32(imgHeight - (pixels(:,3) + imgHeight/2));
     % Plot intersection points between lidar rays and near plane
-    scatter3(pixels(:,1),pixels(:,2),pixels(:,3),'.');
+    %scatter3(pixels(:,1),pixels(:,2),pixels(:,3),'.');
     
 end
 
