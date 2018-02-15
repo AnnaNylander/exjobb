@@ -1,39 +1,60 @@
-far = 1000;             % Far field distance
-lidarResH = 0.16;       % Horizontal angular resolution of lidar
-lidarResV = 1.33;       % Vertical angular resolution of lidar
-cameraWidth = 2000;     % Width in pixels of the depth images
-cameraHeight = 1677;    % Height in pixels of depth images
-fovH = 90;              % Horizontal field of view
+FAR = 1000;           % Far field distance
+LIDAR_RES_H = 0.16;   % Horizontal angular resolution of lidar
+LIDAR_RES_V = 1.33;   % Vertical angular resolution of lidar
+CAMERA_WIDTH = 2000;  % Width in pixels of the depth images
+CAMERA_HEIGHT = 1677; % Height in pixels of depth images
+FOV_H = 90;           % Horizontal field of view
+INTERPOLATE = true;   % If true, depth values are interpolated in query points
+THRESHOLD = 1;        % Do not interpolate if depth difference is more than threshold
+ROI = 60;             % Omitting points outside a square region of interest with side = ROI
 
 % Decode image data to depth map
-head = DecodeDepth(imread('../example_images/head/image_00034.png'),far);
-tail = DecodeDepth(imread('../example_images/tail/image_00034.png'),far);
-left = DecodeDepth(imread('../example_images/left/image_00034.png'),far);
-right = DecodeDepth(imread('../example_images/right/image_00034.png'),far);
+head = DecodeDepth(imread('../example_images/head/image_00034.png'),FAR);
+tail = DecodeDepth(imread('../example_images/tail/image_00034.png'),FAR);
+left = DecodeDepth(imread('../example_images/left/image_00034.png'),FAR);
+right = DecodeDepth(imread('../example_images/right/image_00034.png'),FAR);
 
-% Calculate which pixels that are hit by lidar rays. Also, return lidar ray
-% angles.
-[pixels, angles] = GetRelevantPixels(lidarResH,lidarResV,cameraWidth,cameraHeight,fovH);
+% Calculate the coordinates hit by lidar rays in the image, together with
+% the corresponding lidar ray angles.
+[coords, angles] = GetRelevantCoordinates(LIDAR_RES_H,LIDAR_RES_V,CAMERA_WIDTH,CAMERA_HEIGHT, FOV_H);
 
-% Concatenate pixels and angles, and store in csv file for use in Python
-data = [pixels(:,2), pixels(:,3), angles(:,1),angles(:,2)];
-csvwrite('pixels_and_angles.csv',data);
+yCoords = coords(:,2);
+zCoords = coords(:,3);
+
+% Concatenate coordinates and angles, and store in csv file for use in Python
+data = [coords(:,2), coords(:,3), angles(:,1),angles(:,2)];
+csvwrite('coords_and_angles.csv',data);
+
+if INTERPOLATE
+    % Get interpolated value at each point
+    vHead = Interpolate2D(head, yCoords, zCoords,THRESHOLD);
+    vTail = Interpolate2D(tail, yCoords, zCoords,THRESHOLD);
+    vLeft = Interpolate2D(left, yCoords, zCoords,THRESHOLD);
+    vRight = Interpolate2D(right, yCoords, zCoords,THRESHOLD);
+else
+    % Return the pixel values that the query points are hitting,
+    % without interpolation.
+    vHead = GetPixelValues(head, yCoords, zCoords);
+    vTail = GetPixelValues(tail, yCoords, zCoords);
+    vLeft = GetPixelValues(left, yCoords, zCoords);
+    vRight = GetPixelValues(right, yCoords, zCoords);
+end
 
 % Calculate coordinates from angles and depth values
-[xH,yH,zH] = GetCoordinates(head,angles,pixels);
-[xT,yT,zT] = GetCoordinates(tail,angles,pixels);
-[xL,yL,zL] = GetCoordinates(left,angles,pixels);
-[xR,yR,zR] = GetCoordinates(right,angles,pixels);
+[xH,yH,zH] = GetCoordinates(vHead,angles);
+[xT,yT,zT] = GetCoordinates(vTail,angles);
+[xL,yL,zL] = GetCoordinates(vLeft,angles);
+[xR,yR,zR] = GetCoordinates(vRight,angles);
 
 % Rotate coordinates according to which camera they correspond to
 [xT,yT,zT] = ZAxisRotation(xT,yT,zT,degtorad(180));
 [xL,yL,zL] = ZAxisRotation(xL,yL,zL,degtorad(-90));
 [xR,yR,zR] = ZAxisRotation(xR,yR,zR,degtorad(90));
 
-% Stack all coordinates
-x = [xH;xT;xL;xR];
-y = [yH;yT;yL;yR];
-z = [zH;zT;zL;zR];
+[xH,yH,zH] = TrimToRoi([xH,yH,zH],ROI);
+[xT,yT,zT] = TrimToRoi([xT,yT,zT],ROI);
+[xL,yL,zL] = TrimToRoi([xL,yL,zL],ROI);
+[xR,yR,zR] = TrimToRoi([xR,yR,zR],ROI);
 
 % Plot each camera's point cloud
 figure;

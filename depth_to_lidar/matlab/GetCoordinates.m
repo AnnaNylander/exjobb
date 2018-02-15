@@ -1,14 +1,11 @@
-function [x,y,z] = GetCoordinates(imageA,angles, pixels)
-    pixels = uint32(pixels);
-    nPoints = length(pixels);
+function [x,y,z] = GetCoordinates(values,angles)
+    nPoints = length(values);
     c = zeros(nPoints,3);
     
    for i = 1:nPoints
        v = degtorad(angles(i,1));
        h = -degtorad(angles(i,2));
-       pixelX = pixels(i,2);
-       pixelY = pixels(i,3);
-       r = imageA(pixelY,pixelX);
+       r = values(i);
 
        [x,y,z] = sph2cart(h,v,r);
 
