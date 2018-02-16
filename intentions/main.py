@@ -49,7 +49,7 @@ def getIntentions():
     csvreader = csv.DictReader(open(args.file), delimiter=';')
     print("Reading from " + args.file + " and calculating intentions")
     csvwriter = csv.writer(open(args.targetFile, 'w', newline=''), delimiter=';')
-    csvwriter.writerow(['intention_direction', 'intention_proximity'])
+    csvwriter.writerow(['timestamp','intention_direction', 'intention_proximity'])
 
     #init values
     intention_type = None
