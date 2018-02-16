@@ -65,7 +65,7 @@ function interpolatedValues = Interpolate2D(V,Xquery,Yquery, threshold)
         
         c = 0;
         %If difference is larger than threshold, do not interpolate.
-        if d1 > threshold || d2 > threshold || d3 > threshold || d4 > threshold 
+        if max([d1, d2, d3, d4],1) > threshold 
             c = v;
         else
             % Linearly interpolate between pixel values to find value in query

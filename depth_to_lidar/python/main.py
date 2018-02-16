@@ -4,9 +4,9 @@ from depth_to_point_cloud import depth_to_point_cloud
 from point_cloud_to_image import trim_to_roi
 from PIL import Image
 
-# Region of interest side length, in meters.
-roi = 60
-cells = 600
+roi = 60        # Region of interest side length, in meters.
+cells = 600     # Number of cells on a side in the output image
+far = 1000      # Far plane distance
 
 # Read depth maps
 head = misc.imread('../example_images/head/image_00034.png')
@@ -15,7 +15,7 @@ left = misc.imread('../example_images/left/image_00034.png')
 right = misc.imread('../example_images/right/image_00034.png')
 
 # Convert depth maps to 3D point cloud
-point_cloud = depth_to_point_cloud(head, tail, left, right)
+point_cloud = depth_to_point_cloud(head, tail, left, right, far, interpolate=True, threshold=1.0)
 # Trim point cloud to only contain points within the region of interest
 point_cloud = trim_to_roi(point_cloud,roi)
 # TODO Count number of points within each grid cell
