@@ -36,5 +36,4 @@ def getIntentionG(origin, destination):
     """ Get intentions from Google Maps API. """
     directions_result = gmaps.directions(origin, destination, mode="driving")
     (turn_type, turn_coord, distance_to_turn) = parseResult(directions_result)
-    print(turn_type, turn_coord, distance_to_turn)
     return [turn_type, distance_to_turn]

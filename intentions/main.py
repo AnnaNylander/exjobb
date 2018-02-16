@@ -47,7 +47,8 @@ def getIntentions():
     """ Read GPS-IMU values from csv file and calculate intentions.
     Then write the intentions to a new csv file."""
     csvreader = csv.DictReader(open(args.file), delimiter=';')
-    print("Reading from " + args.file + " and calculating intentions")
+    print("Reading from " + args.file + " and calculating intentions." +\
+            " Writing to " + args.targetFile)
     csvwriter = csv.writer(open(args.targetFile, 'w', newline=''), delimiter=';')
     csvwriter.writerow(['timestamp','intention_direction', 'intention_proximity'])
 
