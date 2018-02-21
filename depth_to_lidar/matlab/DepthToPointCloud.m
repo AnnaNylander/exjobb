@@ -1,18 +1,18 @@
 FAR = 1000;           % Far field distance
 LIDAR_RES_H = 0.16;   % Horizontal angular resolution of lidar
 LIDAR_RES_V = 1.33;   % Vertical angular resolution of lidar
-CAMERA_WIDTH = 2000;  % Width in pixels of the depth images
-CAMERA_HEIGHT = 1677; % Height in pixels of depth images
+CAMERA_WIDTH = 500;  % Width in pixels of the depth images (2000) (500)
+CAMERA_HEIGHT = 420; % Height in pixels of depth images (1677) (420)
 FOV_H = 90;           % Horizontal field of view
-INTERPOLATE = true;   % If true, depth values are interpolated in query points
-THRESHOLD = 1;        % Do not interpolate if depth difference is more than threshold
+INTERPOLATE = false;   % If true, depth values are interpolated in query points
+THRESHOLD = 2;        % Do not interpolate if depth difference is more than threshold
 ROI = 60;             % Omitting points outside a square region of interest with side = ROI
 
 % Decode image data to depth map
-head = DecodeDepth(imread('../example_images/head/image_00034.png'),FAR);
-tail = DecodeDepth(imread('../example_images/tail/image_00034.png'),FAR);
-left = DecodeDepth(imread('../example_images/left/image_00034.png'),FAR);
-right = DecodeDepth(imread('../example_images/right/image_00034.png'),FAR);
+head = DecodeDepth(imread('../example_images/head/image_00060.png'),FAR);
+tail = DecodeDepth(imread('../example_images/tail/image_00060.png'),FAR);
+left = DecodeDepth(imread('../example_images/left/image_00060.png'),FAR);
+right = DecodeDepth(imread('../example_images/right/image_00060.png'),FAR);
 
 % Calculate the coordinates hit by lidar rays in the image, together with
 % the corresponding lidar ray angles.

@@ -26,9 +26,9 @@ function interpolatedValues = Interpolate2D(V,Xquery,Yquery, threshold)
         
         % If the queried point is to the left of the pixel's center
         if decimalX <= 0.5
-            cX1 = cX; % Set cX1 to the be the pixel index of cX
-            cX2 = cX - 1; % We're interested in the pixel to the left of cX
-            fx = decimalX + 0.5;
+            cX1 = cX - 1; % Set cX1 to the be the pixel index of cX
+            cX2 = cX; % We're interested in the pixel to the left of cX
+            fx = decimalX - 0.5;
         else
             cX1 = cX + 1; % We're interested in the pixel to the right of cX
             cX2 = cX; % Set cX2 to the be the pixel index of cX
@@ -49,6 +49,16 @@ function interpolatedValues = Interpolate2D(V,Xquery,Yquery, threshold)
             fy = decimalY - 0.5;
         end
         
+        cX1 = max(cX1,1);
+        cX2 = max(cX2,1);
+        cY1 = max(cY1,1);
+        cY2 = max(cY2,1);
+        
+        cX1 = min(cX1,500);
+        cX2 = min(cX2,500);
+        cY1 = min(cY1,420);
+        cY2 = min(cY2,420);
+        
         % Get value in each pixel of relevance
         v1 = V(cY1,cX1);
         v2 = V(cY1,cX2);
@@ -57,6 +67,12 @@ function interpolatedValues = Interpolate2D(V,Xquery,Yquery, threshold)
         
         % Calculate difference in pixel intensity between pixel hit by
         % query point and the other three pixels.
+        cY = max(cY,1);
+        cX = max(cX,1);
+        cY = min(cY,420);
+        cX = min(cX,500);
+
+        
        	v = V(cY,cX);
         d1 = abs(v - v1);
         d2 = abs(v - v2);
@@ -65,7 +81,7 @@ function interpolatedValues = Interpolate2D(V,Xquery,Yquery, threshold)
         
         c = 0;
         %If difference is larger than threshold, do not interpolate.
-        if max([d1, d2, d3, d4],1) > threshold 
+        if max([d1, d2, d3, d4]) > threshold 
             c = v;
         else
             % Linearly interpolate between pixel values to find value in query
