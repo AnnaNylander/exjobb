@@ -4,11 +4,13 @@ function [x,y,z] = GetCoordinates(values,angles)
     
    for i = 1:nPoints
        v = degtorad(angles(i,1));
-       h = -degtorad(angles(i,2));
+       h = degtorad(angles(i,2));
        r = values(i);
 
        [x,y,z] = sph2cart(h,v,r);
 
+       % Depth is the perpendicular distance between a point and the image
+       % plane, so we need some correction for this.
        c(i,1) = (1/cos(h))*(1/cos(v))*x;
        c(i,2) = (1/cos(h))*(1/cos(v))*y;
        c(i,3) = (1/cos(h))*(1/cos(v))*z;

@@ -1,11 +1,11 @@
 FAR = 1000;           % Far field distance
 LIDAR_RES_H = 0.16;   % Horizontal angular resolution of lidar
 LIDAR_RES_V = 1.33;   % Vertical angular resolution of lidar
-CAMERA_WIDTH = 500;  % Width in pixels of the depth images (2000) (500)
-CAMERA_HEIGHT = 420; % Height in pixels of depth images (1677) (420)
+CAMERA_WIDTH = 500;   % Width in pixels of the depth images (2000) (500)
+CAMERA_HEIGHT = 420;  % Height in pixels of depth images (1677) (420)
 FOV_H = 90;           % Horizontal field of view
-INTERPOLATE = false;   % If true, depth values are interpolated in query points
-THRESHOLD = 2;        % Do not interpolate if depth difference is more than threshold
+INTERPOLATE = true;  % If true, depth values are interpolated in query points
+THRESHOLD = 5;        % Do not interpolate if depth difference is more than threshold
 ROI = 60;             % Omitting points outside a square region of interest with side = ROI
 
 % Decode image data to depth map
@@ -15,29 +15,37 @@ left = DecodeDepth(imread('../example_images/left/image_00060.png'),FAR);
 right = DecodeDepth(imread('../example_images/right/image_00060.png'),FAR);
 
 % Calculate the coordinates hit by lidar rays in the image, together with
-% the corresponding lidar ray angles.
-[coords, angles] = GetRelevantCoordinates(LIDAR_RES_H,LIDAR_RES_V,CAMERA_WIDTH,CAMERA_HEIGHT, FOV_H);
-
-yCoords = coords(:,2);
-zCoords = coords(:,3);
+% the corresponding lidar ray angles. The output coordinates of 
+% GetRelevantCoordinates are with respect to the image, which has (0,0) in 
+% the top left corner. This means that a vertical angle with negative value
+% is pointing towards the ground, but the coordinate on the y-axis is large.
+[xCoords, yCoords, angles] = ...
+    GetRelevantCoordinates(LIDAR_RES_H,LIDAR_RES_V,CAMERA_WIDTH,CAMERA_HEIGHT, FOV_H);
 
 % Concatenate coordinates and angles, and store in csv file for use in Python
-data = [coords(:,2), coords(:,3), angles(:,1),angles(:,2)];
+data = [xCoords, yCoords, angles(:,1),angles(:,2)];
 csvwrite('coords_and_angles.csv',data);
 
 if INTERPOLATE
     % Get interpolated value at each point
-    vHead = Interpolate2D(head, yCoords, zCoords,THRESHOLD);
-    vTail = Interpolate2D(tail, yCoords, zCoords,THRESHOLD);
-    vLeft = Interpolate2D(left, yCoords, zCoords,THRESHOLD);
-    vRight = Interpolate2D(right, yCoords, zCoords,THRESHOLD);
+    %vHead = Interpolate2D_2(head, xCoords, yCoords,THRESHOLD);
+    %vTail = Interpolate2D_2(tail, xCoords, yCoords,THRESHOLD);
+    %vLeft = Interpolate2D_2(left, xCoords, yCoords,THRESHOLD);
+    %vRight = Interpolate2D_2(right, xCoords, yCoords,THRESHOLD);
+    
+    xSamples = [0:size(head,2)-1] + 0.5;
+    ySamples = [0:size(head,1)-1] + 0.5;
+    vHead = interp2(xSamples,ySamples,head, xCoords, yCoords,'linear');
+    vTail = interp2(xSamples,ySamples,tail, xCoords, yCoords,'linear');
+    vLeft = interp2(xSamples,ySamples,left, xCoords, yCoords,'linear');
+    vRight = interp2(xSamples,ySamples,right, xCoords, yCoords,'linear');
 else
     % Return the pixel values that the query points are hitting,
     % without interpolation.
-    vHead = GetPixelValues(head, yCoords, zCoords);
-    vTail = GetPixelValues(tail, yCoords, zCoords);
-    vLeft = GetPixelValues(left, yCoords, zCoords);
-    vRight = GetPixelValues(right, yCoords, zCoords);
+    vHead = GetPixelValues(head, xCoords, yCoords);
+    vTail = GetPixelValues(tail, xCoords, yCoords);
+    vLeft = GetPixelValues(left, xCoords, yCoords);
+    vRight = GetPixelValues(right, xCoords, yCoords);
 end
 
 % Calculate coordinates from angles and depth values
@@ -46,7 +54,8 @@ end
 [xL,yL,zL] = GetCoordinates(vLeft,angles);
 [xR,yR,zR] = GetCoordinates(vRight,angles);
 
-% Rotate coordinates according to which camera they correspond to
+% Rotate coordinates according to which camera they correspond to.
+% Positive input angle in ZAxisRotation means clockwise rotation.
 [xT,yT,zT] = ZAxisRotation(xT,yT,zT,degtorad(180));
 [xL,yL,zL] = ZAxisRotation(xL,yL,zL,degtorad(-90));
 [xR,yR,zR] = ZAxisRotation(xR,yR,zR,degtorad(90));

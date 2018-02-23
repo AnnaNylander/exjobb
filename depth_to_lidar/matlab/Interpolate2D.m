@@ -1,97 +1,136 @@
-function interpolatedValues = Interpolate2D(V,Xquery,Yquery, threshold)
+function interpolatedValues = Interpolate2D(V, Xquery, Yquery, threshold)
 
     % Four pixels with indices cX and cY:
-    % (cX1,cY1) (cX2,cY1)
-    % (cX1,cY2) (cX2,cY2)
+    % (x1,y1) (x2,y1)
+    % (x1,y2) (x2,y2)
     
     nPoints = length(Xquery);
     interpolatedValues = zeros(nPoints,1);
+    height = size(V,1);
+    width = size(V,2);
     
     % For each point
     for iPoint = 1:nPoints
         
-        % Instantiate coordinate variables
-        cX1 = 0; cX2 = 0; cY1 = 0; cY2 = 0;
-        fx = 0; fy = 0;
-        
         % Get the query point coordinates
-        Xq = Xquery(iPoint);
-        Yq = Yquery(iPoint);
-        
-        % Get horizontal pixel index on which the point lies
-        cX = floor(Xq);
+        x = Xquery(iPoint);
+        y = Yquery(iPoint);
 
-        % decimal part of point from pixel's beginning
-        decimalX = Xq - cX;
+        boundL = x < 0.5;               % Are we at left boundary?
+        boundR = x > size(V,2) - 0.5;   % Are we at right boundary?
+        boundT = y < 0.5;               % Are we at upper boundary?
+        boundB = y > size(V,1) - 0.5;   % Are we att lower boundary?
         
-        % If the queried point is to the left of the pixel's center
-        if decimalX <= 0.5
-            cX1 = cX - 1; % Set cX1 to the be the pixel index of cX
-            cX2 = cX; % We're interested in the pixel to the left of cX
-            fx = decimalX - 0.5;
+        % Get the pixel index which the query point lies in.
+        % Here we assume pixel indices start at 0.
+        if boundR
+            xp = width - 1;
         else
-            cX1 = cX + 1; % We're interested in the pixel to the right of cX
-            cX2 = cX; % Set cX2 to the be the pixel index of cX
-            fx = decimalX - 0.5;
+            xp = floor(x);
         end
         
-        % Repeat procedure for y-axis
-        cY = floor(Yq);
-        decimalY = Yq - cY;
-
-        if decimalY <= 0.5
-            cY1 = cY;
-            cY2 = cY - 1;
-            fy = decimalY + 0.5;
+        if boundB
+            yp = height - 1;
         else
-            cY1 = cY + 1;
-            cY2 = cY;
-            fy = decimalY - 0.5;
+            yp = floor(y);
         end
         
-        cX1 = max(cX1,1);
-        cX2 = max(cX2,1);
-        cY1 = max(cY1,1);
-        cY2 = max(cY2,1);
+        decimalX = x - xp;
+        decimalY = y - yp;
         
-        cX1 = min(cX1,500);
-        cX2 = min(cX2,500);
-        cY1 = min(cY1,420);
-        cY2 = min(cY2,420);
-        
-        % Get value in each pixel of relevance
-        v1 = V(cY1,cX1);
-        v2 = V(cY1,cX2);
-        v3 = V(cY2,cX1);
-        v4 = V(cY2,cX2);
-        
-        % Calculate difference in pixel intensity between pixel hit by
-        % query point and the other three pixels.
-        cY = max(cY,1);
-        cX = max(cX,1);
-        cY = min(cY,420);
-        cX = min(cX,500);
-
-        
-       	v = V(cY,cX);
-        d1 = abs(v - v1);
-        d2 = abs(v - v2);
-        d3 = abs(v - v3);
-        d4 = abs(v - v4);
-        
-        c = 0;
-        %If difference is larger than threshold, do not interpolate.
-        if max([d1, d2, d3, d4]) > threshold 
-            c = v;
+        if decimalX < 0.5
+            x1 = xp - 1;   % Set cX1 to the be the pixel to the left of cX
+            x2 = xp;       % The query point is in pixel cX2
         else
-            % Linearly interpolate between pixel values to find value in query
-            % point.
-            a = v1*fx + v2*(1-fx);
-            b = v3*fx + v4*(1-fx);
-            c = a*fy + b*(1-fy);
+            x1 = xp;       % We're interested in the pixel to the right of cX
+            x2 = xp + 1;   % Set cX2 to the be the pixel index of cX
+        end
+        
+        if decimalY < 0.5
+            y1 = yp - 1;   
+            y2 = yp;
+        else
+            y1 = yp;       
+            y2 = yp + 1;
+        end
+        
+
+        % The most common case is to not be on any boundary
+        if ~(boundL || boundR || boundT || boundB)
+            
+            % Get value in each pixel of relevance
+            v1 = V(y1 + 1,x1 + 1);
+            v2 = V(y1 + 1,x2 + 1);
+            v3 = V(y2 + 1,x1 + 1);
+            v4 = V(y2 + 1,x2 + 1);
+            
+            % Interpolate only if difference between any pair of depth
+            % values does not exceed threshold.
+            if max([v1,v2,v3,v4]) - min([v1,v2,v3,v4]) < threshold
+                a = v3*((x2+0.5) - x) + v4*(x - (x1+0.5));
+                b = v1*((x2+0.5) - x) + v2*(x - (x1+0.5));
+                c = b*((y2+0.5) - y) + a*(y - (y1+0.5));
+            else
+                c = V(yp + 1,xp + 1);
+            end
+    
+        % If we are in a corner pixel
+        elseif (boundL || boundR) && (boundT || boundB)
+            
+            % Just return pixel value without interpolating
+            c = V(yp + 1,xp + 1);
+         
+        elseif boundT % If we are at top boundary
+            
+            % Interpolate in x only
+            v3 = V(y2 + 1,x1 + 1);
+            v4 = V(y2 + 1,x2 + 1);
+            
+            if max(v3,v4) - min(v3,v4) < threshold
+                c = v3*((x2+0.5) - x) + v4*(x - (x1+0.5));
+            else
+                c = V(yp + 1,xp + 1);
+            end
+            
+        elseif boundB % If we are at bottom boundary
+            
+            % Interpolate in x only
+            v1 = V(y1 + 1,x1 + 1);
+            v2 = V(y1 + 1,x2 + 1);
+            
+            if max(v1,v2) - min(v1,v2) < threshold
+                c = v1*((x2+0.5) - x) + v2*(x - (x1+0.5));
+            else
+                c = V(yp + 1,xp + 1);
+            end
+
+        elseif boundL % If we are at left boundary
+            
+            % Interpolate in y only
+            v2 = V(y1 + 1,x2 + 1);
+            v4 = V(y2 + 1,x2 + 1);
+            
+            if max(v2,v4) - min(v2,v4) < threshold
+                c = v2*((y2+0.5) - y) + v4*(y - (y1+0.5));
+            else
+                c = V(yp + 1,xp + 1);
+            end
+                
+        else % We must be at right boundary
+            
+            % Interpolate in y only
+            v1 = V(y1 + 1,x1 + 1);
+            v3 = V(y2 + 1,x1 + 1);
+            
+            if max(v2,v4) - min(v2,v4) < threshold
+                c = v1*((y2+0.5) - y) + v3*(y - (y1+0.5));
+            else
+                c = V(yp + 1,xp + 1);
+            end
         end
         
         interpolatedValues(iPoint) = c;
+
     end
 end
 
