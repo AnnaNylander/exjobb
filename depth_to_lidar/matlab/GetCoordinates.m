@@ -1,3 +1,4 @@
+% Convert spherical coordinates into cartesian with correction
 function [x,y,z] = GetCoordinates(values,angles)
     nPoints = length(values);
     c = zeros(nPoints,3);

@@ -5,7 +5,7 @@ CAMERA_WIDTH = 500;   % Width in pixels of the depth images (2000) (500)
 CAMERA_HEIGHT = 420;  % Height in pixels of depth images (1677) (420)
 FOV_H = 90;           % Horizontal field of view
 INTERPOLATE = true;  % If true, depth values are interpolated in query points
-THRESHOLD = 5;        % Do not interpolate if depth difference is more than threshold
+THRESHOLD = 1.5;        % Do not interpolate if depth difference is more than threshold
 ROI = 60;             % Omitting points outside a square region of interest with side = ROI
 
 % Decode image data to depth map
@@ -28,17 +28,10 @@ csvwrite('coords_and_angles.csv',data);
 
 if INTERPOLATE
     % Get interpolated value at each point
-    %vHead = Interpolate2D_2(head, xCoords, yCoords,THRESHOLD);
-    %vTail = Interpolate2D_2(tail, xCoords, yCoords,THRESHOLD);
-    %vLeft = Interpolate2D_2(left, xCoords, yCoords,THRESHOLD);
-    %vRight = Interpolate2D_2(right, xCoords, yCoords,THRESHOLD);
-    
-    xSamples = [0:size(head,2)-1] + 0.5;
-    ySamples = [0:size(head,1)-1] + 0.5;
-    vHead = interp2(xSamples,ySamples,head, xCoords, yCoords,'linear');
-    vTail = interp2(xSamples,ySamples,tail, xCoords, yCoords,'linear');
-    vLeft = interp2(xSamples,ySamples,left, xCoords, yCoords,'linear');
-    vRight = interp2(xSamples,ySamples,right, xCoords, yCoords,'linear');
+    vHead = Interpolate2D(head, xCoords, yCoords,THRESHOLD);
+    vTail = Interpolate2D(tail, xCoords, yCoords,THRESHOLD);
+    vLeft = Interpolate2D(left, xCoords, yCoords,THRESHOLD);
+    vRight = Interpolate2D(right, xCoords, yCoords,THRESHOLD);
 else
     % Return the pixel values that the query points are hitting,
     % without interpolation.
