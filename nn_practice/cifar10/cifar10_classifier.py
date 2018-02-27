@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 from data_to_dict import getTestSet,getTrainingSet,getTrainingBatch
 from dataset import CifarDataSet
-from network import First_Network, Network2
+from network import First_Network, Network
 from result_meter import ResultMeter
 
 # NOTE! Validate during traning. Test is last when model finished traning.
@@ -40,20 +40,20 @@ def main():
     args = parser.parse_args()
     best_res = 10000 #big number
     D_in, D_out = 32*32, 10
-    learning_rate = 1e-5
+    learning_rate = 1e-4
     epoch_start = 0
 
     # load all time best
-    #print("-----Load all time best loss (for comparision)-----")
-    #all_time_best_res = 10000 # big number
-    #all_time_best = load_checkpoint('saved/all_time_best.pt')
-    #if all_time_best is not None:
-    #    all_time_best_res = all_time_best['best_res']
-    #    print("avg loss @:",all_time_best_res)
+    print("-----Load all time best loss (for comparision)-----")
+    all_time_best_res = 10000 # big number
+    all_time_best = load_checkpoint('saved/all_time_best.pt')
+    if all_time_best is not None:
+        all_time_best_res = all_time_best['best_res']
+        print("avg loss @:",all_time_best_res)
 
     # create model
     print("-----Creating network-----")
-    model = Network2()
+    model = Network()
     model.cuda()
 
     # define loss function and optimizer
@@ -105,14 +105,14 @@ def main():
         #remember best and save checkpoint
         is_best = res < best_res
         best_res = min(res, best_res)
-        #is_all_time_best = res < all_time_best_res
-        #all_time_best_res = min(res, all_time_best_res)
+        is_all_time_best = res < all_time_best_res
+        all_time_best_res = min(res, all_time_best_res)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
             'best_res': best_res,
             'optimizer' : optimizer.state_dict(),
-        }, is_best) #, is_all_time_best)
+        }, is_best, is_all_time_best)
 
 
 def train(model, dataloader, loss_fn, optimizer, epoch):
@@ -178,15 +178,15 @@ def validate(model, dataloader, loss_fn):
     return losses.avg
 
 
-def save_checkpoint(state, is_best, #is_all_time_best,
+def save_checkpoint(state, is_best, is_all_time_best,
         filename = 'saved/checkpoint.pt'):
     torch.save(state, filename)
     if is_best:
         print("Best thus far!")
         shutil.copyfile(filename, 'saved/best.pt')
-    #if is_all_time_best:
-    #    print("ALL TIME BEST! GOOD JOB!")
-    #    shutil.copyfile(filename, 'saved/all_time_best.pt')
+    if is_all_time_best:
+        print("ALL TIME BEST! GOOD JOB!")
+        shutil.copyfile(filename, 'saved/all_time_best.pt')
     print("\n")
 
 def load_checkpoint(filename):
