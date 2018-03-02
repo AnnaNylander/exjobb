@@ -21,17 +21,17 @@ from carla.settings import CarlaSettings
 from carla.tcp import TCPConnectionError
 from carla.util import print_over_same_line
 import numpy as np
-from preprocessing.depth_to_point_cloud import depth_to_point_cloud
-from preprocessing.point_cloud_to_image import trim_to_roi
+import save_util as saver
+from collections import defaultdict
+import datetime
 
-ROI = 60        # Region of interest side length, in meters.
-FAR = 1000      # Far plane distance
-THRESHOLD = 1.5 # Do not interpolate if difference between pixels is larger than this
-INTERPOLATE = True
-# Assumes subfolder 'point_cloud' and 'measurements' exist
+N_FRAMES = 100   # Set number of frames in episode
 SAVE_PATH = '/home/annaochjacob/Documents/recorded_data'
-POINT_CLOUD_PRECISION = '%.3f'
-MEASUREMENTS_PRECISION = '%.8f'
+SAVE_PATH_PLAYER = SAVE_PATH + '/player_measurements'
+SAVE_PATH_STATIC = SAVE_PATH + '/static_measurements'
+SAVE_PATH_DYNAMIC = SAVE_PATH + '/dynamic_measurements'
+SAVE_PATH_POINT_CLOUD = SAVE_PATH + '/point_cloud'
+MOVING_AVERAGE_LENGTH = 10
 
 def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filename_format, settings_filepath):
 
@@ -99,84 +99,51 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
         print('Starting new episode...')
         client.start_episode(player_start)
 
+        episode_start = datetime.datetime.now()
+        print("Episode started %s" % episode_start.strftime("%Y-%m-%d %H:%M"))
+        print("Space required: %.2fGB" %(N_FRAMES*1.1/1024))
+        print("---------------------------------------------------------------")
+        # Create placeholders for measurement values
+        player_values = np.zeros([N_FRAMES,22])
+        dynamic_values = defaultdict(list)
+
+        frame_durations = MOVING_AVERAGE_LENGTH * [0]
+
         # Iterate every frame in the episode.
-        n_frames = 3
-        measurement_values = np.zeros([n_frames + 1,22])
-        for frame in range(1,n_frames):
+        for frame in range(1,N_FRAMES):
+            # Time processing of each frame to estimate episode duration
+            start = time.time()
 
             # Read the data produced by the server this frame.
             measurements, sensor_data = client.read_data()
 
-            print(measurements)
+            # If first frame, get static info about non-player agents and save
+            # to csv file. Also, get header for dynamic measurements
+            if frame == 1:
+                static_values = saver.get_static_measurements(measurements)
+                saver.save_static_measurements(static_values, SAVE_PATH_STATIC)
 
-            # Print some of the measurements.
-            print_measurements(measurements)
+                # Create csv header for objects with dynamic states
+                header_dynamic = saver.get_dynamic_measurements_header(measurements)
 
-            # Save the images to disk if requested.
-            if save_images_to_disk:
-                for name, image in sensor_data.items():
-                    image.save_to_disk(image_filename_format.format(1, name, frame))
+            # TODO Save front RGB camera images
+            #image.save_to_disk(image_filename_format.format(1, name, frame))
 
-                    head = sensor_data['CameraDepthHead'].data
-                    tail = sensor_data['CameraDepthTail'].data
-                    left = sensor_data['CameraDepthLeft'].data
-                    right = sensor_data['CameraDepthRight'].data
+            # Save point cloud from current frame
+            saver.save_point_cloud(frame, sensor_data, SAVE_PATH_POINT_CLOUD)
 
-                    # Convert depth maps to 3D point cloud
-                    point_cloud = depth_to_point_cloud(head, tail, left, right, FAR, interpolate=INTERPOLATE, threshold=THRESHOLD)
-                    # Trim point cloud to only contain points within the region of interest
-                    point_cloud = trim_to_roi(point_cloud,ROI)
-                    # Reduce
-                    # Save point cloud for this frame
-                    np.savetxt(SAVE_PATH + "/point_cloud/pc_%i.csv" %frame, point_cloud,fmt=POINT_CLOUD_PRECISION)
+            # Append player measurements for this frame
+            player_values[frame,:] = saver.get_player_measurements(measurements)
 
-                    player = measurements.player_measurements
-                    control = player.autopilot_control
-                    transform = player.transform
-                    acceleration = player.acceleration
-
-                    measurement_values[frame,0] = measurements.platform_timestamp
-                    measurement_values[frame,1] = measurements.game_timestamp
-
-                    # Location
-                    measurement_values[frame,2] = transform.location.x / 100 #  (cm -> m )
-                    measurement_values[frame,3] = transform.location.y / 100
-                    measurement_values[frame,4] = transform.location.z / 100
-
-                    # Acceleration and forward speed
-                    measurement_values[frame,5] = acceleration.x
-                    measurement_values[frame,6] = acceleration.y
-                    measurement_values[frame,7] = acceleration.z
-                    measurement_values[frame,8] = player.forward_speed
-
-                    # Rotation
-                    measurement_values[frame,9] = transform.rotation.pitch
-                    measurement_values[frame,10] = transform.rotation.roll
-                    measurement_values[frame,11] = transform.rotation.yaw
-
-                    # Collisions
-                    measurement_values[frame,12] = player.collision_vehicles
-                    measurement_values[frame,13] = player.collision_pedestrians
-                    measurement_values[frame,14] = player.collision_other
-
-                    # Intersections
-                    measurement_values[frame,15] = 100 * player.intersection_otherlane
-                    measurement_values[frame,16] = 100 * player.intersection_offroad
-
-                    # SUggested autopilot controler signals
-                    measurement_values[frame,17] = control.steer
-                    measurement_values[frame,18] = control.throttle
-                    measurement_values[frame,19] = control.brake
-                    measurement_values[frame,20] = control.hand_brake
-                    measurement_values[frame,21] = control.reverse
-                    #measurement_values[frame,22] = number_of_agents
-
-                    #save_driving_data(measurements, sensor_data, frame)
+            # Append non-player measurements for this frame
+            #dynamic_values[frame,:] =
+            dynamic_objects = saver.get_dynamic_measurements(measurements)
+            for key, value in dynamic_objects.items():
+                dynamic_values[key].append(value)
 
             # Now we have to send the instructions to control the vehicle.
             # If we are in synchronous mode the server will pause the
             # simulation until we send this control.
-
             if not autopilot_on:
 
                 client.send_control(
@@ -194,12 +161,27 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
                 # server. We can modify it if wanted, here for instance we
                 # will add some noise to the steer.
                 control = measurements.player_measurements.autopilot_control
-                control.steer += random.uniform(-0.1, 0.1)
+                #control.steer += random.uniform(-0.1, 0.1)
                 client.send_control(control)
 
-        # Save measurements of whole episode to one file
-        np.savetxt(SAVE_PATH + "/measurements/m.csv", measurement_values, fmt = MEASUREMENTS_PRECISION)
+            # Print estimated time of arrival
+            stop = time.time()
+            elapsed_time = stop - start
+            frame_durations[frame%MOVING_AVERAGE_LENGTH] = elapsed_time
+            average_time = np.mean(frame_durations)
+            time_left = average_time * (N_FRAMES-frame)
+            m, s = divmod(time_left, 60)
+            h, m = divmod(m, 60)
+            print("Frame %i - ETA %02d:%02d:%02d" % (frame, h, m, s))
 
+        # Save measurements of whole episode to one file
+        saver.save_player_measurements(player_values, SAVE_PATH_PLAYER)
+        saver.save_dynamic_measurements(dynamic_values, SAVE_PATH_DYNAMIC)
+
+        episode_end = datetime.datetime.now()
+        episode_time = episode_end - episode_start
+        print("Episode ended %s, duration %s" \
+            % (episode_end.strftime("%Y-%m-%d %H:%M"), episode_time))
 
 def print_measurements(measurements):
     number_of_agents = len(measurements.non_player_agents)

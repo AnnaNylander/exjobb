@@ -1,0 +1,212 @@
+import numpy as np
+from preprocessing.depth_to_point_cloud import depth_to_point_cloud
+from preprocessing.point_cloud_to_image import trim_to_roi
+
+ROI = 60        # Region of interest side length, in meters.
+FAR = 1000      # Far plane distance
+THRESHOLD = 1.5 # Do not interpolate if difference between pixels is larger than this
+INTERPOLATE = True
+POINT_CLOUD_PRECISION = '%.3f'
+MEASUREMENTS_PRECISION = '%.8f'
+
+def save_point_cloud(frame, sensor_data, save_path):
+    # Read data from depth map sensors
+    head = sensor_data['CameraDepthHead'].data
+    tail = sensor_data['CameraDepthTail'].data
+    left = sensor_data['CameraDepthLeft'].data
+    right = sensor_data['CameraDepthRight'].data
+
+    # Convert depth maps to 3D point cloud
+    point_cloud = depth_to_point_cloud(head, tail, left, right, \
+        FAR, interpolate=INTERPOLATE, threshold=THRESHOLD)
+
+    # Trim point cloud to only contain points within the region of interest
+    point_cloud = trim_to_roi(point_cloud,ROI)
+
+    # Save point cloud for this frame
+    np.savetxt(save_path + "/pc_%i.csv" %frame, point_cloud, \
+        POINT_CLOUD_PRECISION)
+
+def save_player_measurements(measurements, save_path):
+    # Save measurements of whole episode to one file
+    header_player = get_player_measurements_header()
+    np.savetxt(save_path + "/pm.csv", \
+        measurements, fmt=MEASUREMENTS_PRECISION, header=header_player, \
+        comments='')
+
+def get_player_measurements(measurements):
+    # Separate measurement types
+    player = measurements.player_measurements
+    control = player.autopilot_control
+    transform = player.transform
+    acceleration = player.acceleration
+
+    player_values = np.zeros(22)
+
+    # Time
+    player_values[0] = measurements.platform_timestamp
+    player_values[1] = measurements.game_timestamp
+
+    # Location
+    player_values[2] = transform.location.x / 100 #  (cm -> m )
+    player_values[3] = transform.location.y / 100
+    player_values[4] = transform.location.z / 100
+
+    # Acceleration and forward speed
+    player_values[5] = acceleration.x
+    player_values[6] = acceleration.y
+    player_values[7] = acceleration.z
+    player_values[8] = player.forward_speed
+
+    # Rotation
+    player_values[9] = transform.rotation.pitch
+    player_values[10] = transform.rotation.roll
+    player_values[11] = transform.rotation.yaw
+
+    # Collisions
+    player_values[12] = player.collision_vehicles
+    player_values[13] = player.collision_pedestrians
+    player_values[14] = player.collision_other
+
+    # Intersections
+    player_values[15] = 100 * player.intersection_otherlane
+    player_values[16] = 100 * player.intersection_offroad
+
+    # SUggested autopilot controler signals
+    player_values[17] = control.steer
+    player_values[18] = control.throttle
+    player_values[19] = control.brake
+    player_values[20] = control.hand_brake
+    player_values[21] = control.reverse
+    #player_values[frame,22] = number_of_agents
+    return np.transpose(player_values)
+
+def get_player_measurements_header():
+    header = 'platform_timestamp '
+    header += 'game_timestamp '
+    header += 'location_x '
+    header += 'location_y '
+    header += 'location_z '
+    header += 'acceleration_x '
+    header += 'acceleration_y '
+    header += 'acceleration_z '
+    header += 'forward_speed '
+    header += 'pitch '
+    header += 'roll '
+    header += 'yaw '
+    header += 'collision_vehicles '
+    header += 'collision_pedestrians '
+    header += 'collision_other '
+    header += 'intersection_otherlane '
+    header += 'intersection_offroad '
+    header += 'steer '
+    header += 'throttle '
+    header += 'brake '
+    header += 'handbrake '
+    header += 'reverse'
+    return header
+
+def get_static_measurements_header():
+    header = 'id '
+    header += 'type '
+    header += 'location_x '
+    header += 'location_y '
+    header += 'location_z '
+    header += 'orientation_x '
+    header += 'orientation_y '
+    header += 'yaw '
+    header += 'speed_limit '
+    return header
+
+def get_dynamic_measurements_header(measurements):
+    header = ''
+    for agent in measurements.non_player_agents:
+        agent_type = get_agent_type(agent)
+        if agent_type == 3:
+            agent_id = agent.id
+            agent = agent.traffic_light
+            header += str(agent_id)
+        else:
+            continue
+    return header
+
+def get_agent_type(agent):
+    if agent.vehicle.ByteSize() != 0:
+        return 1 #'vehicle'
+    elif agent.pedestrian.ByteSize() != 0:
+        return 2 #'pedestrian'
+    elif agent.traffic_light.ByteSize() != 0:
+        return 3 #'traffic_light'
+    elif agent.speed_limit_sign.ByteSize() != 0:
+        return 4 #'speed_limit_sign'
+
+def get_static_measurements(measurements):
+    objects = {}
+    for agent in measurements.non_player_agents:
+        agent_id = agent.id
+        agent_type = get_agent_type(agent)
+        speed_limit = 0
+
+        if agent_type == 3:
+            agent = agent.traffic_light
+        elif agent_type == 4:
+            agent = agent.speed_limit_sign
+            speed_limit = agent.speed_limit
+        else:
+            continue
+
+        values = {}
+        values['type'] = agent_type
+        values['location_x'] = agent.transform.location.x
+        values['location_y'] = agent.transform.location.y
+        values['location_z'] = agent.transform.location.z
+        values['orientation_x'] = agent.transform.orientation.x
+        values['orientation_y'] = agent.transform.orientation.y
+        values['yaw'] = agent.transform.rotation.yaw
+        values['speed_limit'] = speed_limit
+        objects[agent_id] = values
+    return objects
+
+def get_dynamic_measurements(measurements):
+    objects = {}
+    for agent in measurements.non_player_agents:
+        agent_type = get_agent_type(agent)
+        if agent_type == 3:
+            # GREEN -> 0, YELLOW -> 1, RED -> 2
+            objects[agent.id] = agent.traffic_light.state
+        else:
+            continue
+    return objects
+
+def save_static_measurements(static_objects, save_path):
+    n_objects = len(static_objects)
+    objects = np.zeros([n_objects,9])
+    for i, key in enumerate(static_objects):
+        values = static_objects[key]
+        objects[i,0] = key
+        objects[i,1] = values['type']
+        objects[i,2] = values['location_x']
+        objects[i,3] = values['location_y']
+        objects[i,4] = values['location_z']
+        objects[i,5] = values['orientation_x']
+        objects[i,6] = values['orientation_y']
+        objects[i,7] = values['yaw']
+        objects[i,8] = values['speed_limit']
+
+    header = get_static_measurements_header()
+    np.savetxt(save_path + "/sm.csv", objects, \
+        header=header, comments='')
+
+def save_dynamic_measurements(dynamic_values, save_path):
+    n_objects = len(dynamic_values)
+    keys = list(dynamic_values.keys())
+    n_frames = len(dynamic_values[keys[0]])
+    objects = np.zeros([n_frames,n_objects])
+    header = ''
+    for i, key in enumerate(dynamic_values):
+        header += str(key) + ' '
+        value = dynamic_values[key] # This is a list of states
+        objects[:,i] = np.asarray(value)
+
+    np.savetxt(save_path + "/dm.csv", \
+        objects, fmt=MEASUREMENTS_PRECISION, header=header, comments='')
