@@ -8,6 +8,8 @@ THRESHOLD = 1.5 # Do not interpolate if difference between pixels is larger than
 INTERPOLATE = True
 POINT_CLOUD_PRECISION = '%.3f'
 MEASUREMENTS_PRECISION = '%.8f'
+DELIMITER = ','
+COMMENTS = ''
 
 def save_point_cloud(frame, sensor_data, save_path):
     # Read data from depth map sensors
@@ -25,14 +27,14 @@ def save_point_cloud(frame, sensor_data, save_path):
 
     # Save point cloud for this frame
     np.savetxt(save_path + "/pc_%i.csv" %frame, point_cloud, \
-        POINT_CLOUD_PRECISION)
+        fmt=POINT_CLOUD_PRECISION, comments=COMMENTS, delimiter=DELIMITER)
 
 def save_player_measurements(measurements, save_path):
     # Save measurements of whole episode to one file
     header_player = get_player_measurements_header()
     np.savetxt(save_path + "/pm.csv", \
         measurements, fmt=MEASUREMENTS_PRECISION, header=header_player, \
-        comments='')
+        comments=COMMENTS, delimiter=DELIMITER)
 
 def get_player_measurements(measurements):
     # Separate measurement types
@@ -82,41 +84,43 @@ def get_player_measurements(measurements):
     return np.transpose(player_values)
 
 def get_player_measurements_header():
-    header = 'platform_timestamp '
-    header += 'game_timestamp '
-    header += 'location_x '
-    header += 'location_y '
-    header += 'location_z '
-    header += 'acceleration_x '
-    header += 'acceleration_y '
-    header += 'acceleration_z '
-    header += 'forward_speed '
-    header += 'pitch '
-    header += 'roll '
-    header += 'yaw '
-    header += 'collision_vehicles '
-    header += 'collision_pedestrians '
-    header += 'collision_other '
-    header += 'intersection_otherlane '
-    header += 'intersection_offroad '
-    header += 'steer '
-    header += 'throttle '
-    header += 'brake '
-    header += 'handbrake '
-    header += 'reverse'
-    return header
+    header = []
+    header.append('platform_timestamp')
+    header.append('game_timestamp')
+    header.append('location_x')
+    header.append('location_y')
+    header.append('location_z')
+    header.append('acceleration_x')
+    header.append('acceleration_y')
+    header.append('acceleration_z')
+    header.append('forward_speed')
+    header.append('pitch')
+    header.append('roll')
+    header.append('yaw')
+    header.append('collision_vehicles')
+    header.append('collision_pedestrians')
+    header.append('collision_other')
+    header.append('intersection_otherlane')
+    header.append('intersection_offroad')
+    header.append('steer')
+    header.append('throttle')
+    header.append('brake')
+    header.append('handbrake')
+    header.append('reverse')
+    return DELIMITER.join(header)
 
 def get_static_measurements_header():
-    header = 'id '
-    header += 'type '
-    header += 'location_x '
-    header += 'location_y '
-    header += 'location_z '
-    header += 'orientation_x '
-    header += 'orientation_y '
-    header += 'yaw '
-    header += 'speed_limit '
-    return header
+    header = []
+    header.append('id')
+    header.append('type')
+    header.append('location_x')
+    header.append('location_y')
+    header.append('location_z')
+    header.append('orientation_x')
+    header.append('orientation_y')
+    header.append('yaw')
+    header.append('speed_limit')
+    return DELIMITER.join(header)
 
 def get_dynamic_measurements_header(measurements):
     header = ''
@@ -194,8 +198,8 @@ def save_static_measurements(static_objects, save_path):
         objects[i,8] = values['speed_limit']
 
     header = get_static_measurements_header()
-    np.savetxt(save_path + "/sm.csv", objects, \
-        header=header, comments='')
+    np.savetxt(save_path + "/sm.csv", objects, fmt=MEASUREMENTS_PRECISION, \
+        header=header, comments=COMMENTS, delimiter=DELIMITER)
 
 def save_dynamic_measurements(dynamic_values, save_path):
     n_objects = len(dynamic_values)
@@ -208,5 +212,5 @@ def save_dynamic_measurements(dynamic_values, save_path):
         value = dynamic_values[key] # This is a list of states
         objects[:,i] = np.asarray(value)
 
-    np.savetxt(save_path + "/dm.csv", \
-        objects, fmt=MEASUREMENTS_PRECISION, header=header, comments='')
+    np.savetxt(save_path + "/dm.csv", objects, fmt=MEASUREMENTS_PRECISION, \
+        header=header, comments=COMMENTS, delimiter=DELIMITER)

@@ -25,7 +25,7 @@ import save_util as saver
 from collections import defaultdict
 import datetime
 
-N_FRAMES = 100   # Set number of frames in episode
+N_FRAMES = 10   # Set number of frames in episode
 SAVE_PATH = '/home/annaochjacob/Documents/recorded_data'
 SAVE_PATH_PLAYER = SAVE_PATH + '/player_measurements'
 SAVE_PATH_STATIC = SAVE_PATH + '/static_measurements'
@@ -126,8 +126,11 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
                 # Create csv header for objects with dynamic states
                 header_dynamic = saver.get_dynamic_measurements_header(measurements)
 
-            # TODO Save front RGB camera images
-            #image.save_to_disk(image_filename_format.format(1, name, frame))
+            # Save front facing RGB camera images
+            if save_images_to_disk:
+                rgb_image = sensor_data['CameraRGB']
+                rgb_image.save_to_disk(\
+                    image_filename_format.format(1, "CameraRGB", frame))
 
             # Save point cloud from current frame
             saver.save_point_cloud(frame, sensor_data, SAVE_PATH_POINT_CLOUD)
