@@ -7,5 +7,5 @@ cd ~/Repos/carla/Unreal/CarlaUE4/LinuxNoEditor
 In another terminal:
 
 cd ~/Repos/exjobb/carla_client
-
+source activate exenv
 python3 client_1.py --carla-settings="/home/annaochjacob/Repos/exjobb/carla_client/CarlaSettings.ini" --images-to-disk --autopilot
