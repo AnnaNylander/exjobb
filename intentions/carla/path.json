@@ -1,0 +1,82 @@
+{
+    "endPosition": {
+        "latitude": "326.05398438",
+        "longitude": "344.78605469"
+    },
+    "startPosition": {
+        "latitude": "330.54000000",
+        "longitude": "381.33996094"
+    },
+    "turns": [
+        {
+            "latitude": "-2.01550766",
+            "longitude": "345.67671875",
+            "type": "left"
+        },
+        {
+            "latitude": "187.21351563",
+            "longitude": "334.39488281",
+            "type": "right"
+        },
+        {
+            "latitude": "194.98189453",
+            "longitude": "102.17975586",
+            "type": "left"
+        },
+        {
+            "latitude": "315.15591797",
+            "longitude": "88.66653320",
+            "type": "left"
+        },
+        {
+            "latitude": "330.83957031",
+            "longitude": "327.33644531",
+            "type": "left"
+        },
+        {
+            "latitude": "137.98968750",
+            "longitude": "338.50937500",
+            "type": "left"
+        },
+        {
+            "latitude": "129.37198242",
+            "longitude": "99.73653320",
+            "type": "left"
+        },
+        {
+            "latitude": "188.10912109",
+            "longitude": "88.89342773",
+            "type": "left"
+        },
+        {
+            "latitude": "199.39330078",
+            "longitude": "323.34933594",
+            "type": "right"
+        },
+        {
+            "latitude": "319.15408203",
+            "longitude": "334.67851562",
+            "type": "left"
+        },
+        {
+            "latitude": "330.58921875",
+            "longitude": "84.42034180",
+            "type": "left"
+        },
+        {
+            "latitude": "141.26988281",
+            "longitude": "92.54470703",
+            "type": "right"
+        },
+        {
+            "latitude": "133.03309570",
+            "longitude": "328.21042969",
+            "type": "left"
+        },
+        {
+            "latitude": "11.08216431",
+            "longitude": "338.92972656",
+            "type": "right"
+        }
+    ]
+}
