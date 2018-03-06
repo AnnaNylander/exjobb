@@ -5,23 +5,23 @@ import math
 
 parser = argparse.ArgumentParser(description='Create json file')
 parser.add_argument('--annofile', metavar='file.csv', dest='annotations',
-                    default='annotations.csv',
+                    default='../../recorded_data/intentions/manual_annotations.csv',
                     help='input file containing postion of car')
 parser.add_argument('--csvfile', metavar='file.csv', dest='csvfile',
-                    default='test_data.csv',
+                    default='../../recorded_data/player_measurements/pm.csv',
                     help='input file containing postion of car')
 parser.add_argument('--jsonfile', metavar='file.json', dest='jsonfile',
-                    default='path.json',
+                    default='../../recorded_data/intentions/intentions.json',
                     help='input file containing the path with turns.')
 
 args = parser.parse_args()
 
 def create_json():
-    csvreader = csv.DictReader(open(args.csvfile), delimiter=' ')
+    csvreader = csv.DictReader(open(args.csvfile), delimiter=',')
     annoreader = csv.DictReader(open(args.annotations), delimiter=' ')
     print("Reading from " + args.annotations +\
-            "and from " + args.csvfile +\
-            " Writing to " + args.jsonfile)
+            "\n and from " + args.csvfile +\
+            "\n Writing to " + args.jsonfile)
 
     data = dict()
     values = dict()
@@ -36,26 +36,27 @@ def create_json():
 
     frame = 1 #offset because data starts at row 1
     last_row = {}
-    data['turns'] = []
+    data['values'] = []
     for row in csvreader:
         time = float (row['game_timestamp'])
         if time == 100: #TODO denna är väldigt oflexibel
-            latitude = row['location_y']
-            longitude = row['location_x']
-            data['startPosition'] = {'longitude': longitude, 'latitude': latitude}
+            location_y = row['location_y']
+            location_x = row['location_x']
+            data['startPosition'] = {'location_x': location_x, 'location_y': location_y}
         if frame in values:
-            latitude = row['location_y']
-            longitude = row['location_x']
-            data['turns'].append({'longitude': longitude, 'latitude': latitude, 'type': values[frame]})
+            location_y = row['location_y']
+            location_x = row['location_x']
+            data['values'].append({'location_x': location_x, 'location_y': location_y, \
+                'data':{'type': values[frame]}})
         last_row = row
         frame = frame+1
 
-    latitude = last_row['location_y']
-    longitude = last_row['location_x']
-    data['endPosition'] = {'longitude': longitude, 'latitude': latitude}
+    location_y = last_row['location_y']
+    location_x = last_row['location_x']
+    data['endPosition'] = {'location_x': location_x, 'location_y': location_y, 'data':{'type':'end'}}
 
     with open(args.jsonfile,"w") as f:
-        json.dump(data,f, sort_keys=True, indent=4, separators=(',', ': '))
+        json.dump(data,f, sort_keys=False, indent=4, separators=(',', ': '))
 
 if __name__=="__main__":
     create_json()
