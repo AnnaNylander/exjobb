@@ -110,7 +110,7 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
         frame_durations = MOVING_AVERAGE_LENGTH * [0]
 
         # Iterate every frame in the episode.
-        for frame in range(1,N_FRAMES):
+        for frame in range(1,N_FRAMES + 1):
             # Time processing of each frame to estimate episode duration
             start = time.time()
 

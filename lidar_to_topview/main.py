@@ -11,11 +11,11 @@ def lidar_to_topview(frame, point_cloud, ROI, CELLS):
         x, y, z = point
         x += ROI/2
         x /= ROI
-        cell_x = (int) (x*CELLS)
+        cell_x = (int) (x*CELLS) - 1
 
         y += ROI/2
         y /= ROI
-        cell_y = (int) (y*CELLS)
+        cell_y = (int) (y*CELLS) - 1
 
         grid[cell_x,cell_y] += 1
 
@@ -29,11 +29,13 @@ def get_max_elevation(frame, point_cloud, ROI, CELLS):
         x, y, z = point
         x += ROI/2
         x /= ROI
-        cell_x = (int) (x*CELLS)
+        if x == 1:
+            print("hehehehehehehehehehhe")
+        cell_x = (int) (x*CELLS) - 1
 
         y += ROI/2
         y /= ROI
-        cell_y = (int) (y*CELLS)
+        cell_y = (int) (y*CELLS) - 1
 
         element = grid[cell_x,cell_y]
         if np.isnan(element) or element < z:

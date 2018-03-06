@@ -123,16 +123,16 @@ def get_static_measurements_header():
     return DELIMITER.join(header)
 
 def get_dynamic_measurements_header(measurements):
-    header = ''
+    header = []
     for agent in measurements.non_player_agents:
         agent_type = get_agent_type(agent)
         if agent_type == 3:
             agent_id = agent.id
             agent = agent.traffic_light
-            header += str(agent_id)
+            header.append(str(agent_id))
         else:
             continue
-    return header
+    return DELIMITER.join(header)
 
 def get_agent_type(agent):
     if agent.vehicle.ByteSize() != 0:
