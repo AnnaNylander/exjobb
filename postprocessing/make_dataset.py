@@ -13,6 +13,8 @@ PATH_OUTPUT = PATH_SAVE + '/output'
 N_STEPS_FUTURE = 30
 N_STEPS_PAST = 30
 PRECISION = '%.8f'
+DELIMITER = ','
+COMMENTS = ''
 
 def main():
     ''' Generates input and output files for player player_measurements.
@@ -38,35 +40,45 @@ def main():
 
         # Save information about past steps in  a separate csv file
         filename_input = (PATH_INPUT + '/input_%i.csv') %frame
-        np.savetxt(filename_input, data_input, delimiter=',', \
-            header=get_input_header(), comments='', fmt=PRECISION)
+        np.savetxt(filename_input, data_input, delimiter=DELIMITER, \
+            header=get_input_header(), comments=COMMENTS, fmt=PRECISION)
 
         # Save information about past steps in  a separate csv file
         filename_output = (PATH_OUTPUT + '/output_%i.csv') %frame
-        np.savetxt(filename_output, data_output, delimiter=',', \
-            header=get_output_header(), comments='', fmt=PRECISION)
+        np.savetxt(filename_output, data_output, delimiter=DELIMITER, \
+            header=get_output_header(), comments=COMMENTS, fmt=PRECISION)
 
 
 def get_input(measurements, frame, n_frames, n_steps, x, y, yaw):
-    data_input = np.zeros([n_steps, 11])
+    all_inputs = np.zeros([n_steps, 7])
 
     for past_step in range(0,n_steps):
         # Get index of past frames, i.e. exluding the current frame
         frame_index = frame - past_step - 1
         # If requested frame is further into the past than frame 0, use 0
         frame_index = max(frame_index,0)
-        column_indices = [2, 3, 4, 5, 6, 7, 8, 11 , 17, 18, 19]
-        row = measurements[frame_index, column_indices]
-
-        # Calculate location, relative to current location and heading
+        # Calculate relative location, forward acceleration etc.
         new_x, new_y = measurements[frame_index, [2, 3]]
-        rel_x, rel_y = get_relative_location(x, y, yaw, new_x, new_y)
-        row[0] = rel_x
-        row[1] = rel_y
+        v_rel_x, v_rel_y = get_relative_location(x, y, yaw, new_x, new_y)
+        acc_x, acc_y, acc_z = measurements[frame_index, [5, 6, 7]]
+        v_forward_acceleration = get_forward_acceleration(acc_x, acc_y, acc_z)
+        v_forward_speed = measurements[frame_index, 8]
+        v_steer, v_throttle, v_break = measurements[frame_index, [17, 18, 19]]
 
-        data_input[past_step,:] = row
+        frame_input = np.zeros(7)
+        frame_input[0] = v_rel_x # location x relative to car
+        frame_input[1] = v_rel_y # location y relative to car
+        frame_input[2] = v_forward_acceleration # forward acceleration
+        frame_input[3] = v_forward_speed # forward speed
+        frame_input[4] = v_steer # steer
+        #frame_input[5] = v_throttle # throttle
+        #frame_input[6] = v_break # break
+        frame_input[5] = 0 # intention direction
+        frame_input[6] = 0 # intention proximity
 
-    return data_input
+        all_inputs[past_step,:] = np.transpose(frame_input)
+
+    return all_inputs
 
 def get_output(measurements, frame, n_frames, n_steps, x, y, yaw):
     data_output = np.zeros([n_steps, 2])
@@ -92,19 +104,22 @@ def get_relative_location(x, y, yaw, new_x, new_y):
 
     return rel[0,0], rel[0,1]
 
+def get_forward_acceleration(acc_x, acc_y, acc_z):
+    squares = np.power([acc_x, acc_y, acc_z], 2)
+    return np.sqrt(np.sum(squares))
+
 def get_input_header():
-    header = 'location_x,'
-    header += 'location_y,'
-    header += 'location_z,'
-    header += 'acceleration_x,'
-    header += 'acceleration_y,'
-    header += 'acceleration_z,'
-    header += 'forward_speed,'
-    header += 'yaw,'
-    header += 'steer,'
-    header += 'throttle,'
-    header += 'brake,'
-    return header
+    header = []
+    header.append('location_x')
+    header.append('location_y')
+    header.append('forward_acceleration')
+    header.append('forward_speed')
+    header.append('steer')
+    header.append('throttle')
+    header.append('brake')
+    header.append('intention_direction')
+    header.append('intention_proximity')
+    return DELIMITER.join(header)
 
 def get_output_header():
     header = 'location_x,'
