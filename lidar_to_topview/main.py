@@ -29,8 +29,6 @@ def get_max_elevation(frame, point_cloud, ROI, CELLS):
         x, y, z = point
         x += ROI/2
         x /= ROI
-        if x == 1:
-            print("hehehehehehehehehehhe")
         cell_x = (int) (x*CELLS) - 1
 
         y += ROI/2
