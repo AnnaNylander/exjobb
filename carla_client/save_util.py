@@ -161,9 +161,9 @@ def get_static_measurements(measurements):
 
         values = {}
         values['type'] = agent_type
-        values['location_x'] = agent.transform.location.x
-        values['location_y'] = agent.transform.location.y
-        values['location_z'] = agent.transform.location.z
+        values['location_x'] = agent.transform.location.x / 100 #  (cm -> m )
+        values['location_y'] = agent.transform.location.y / 100 #  (cm -> m )
+        values['location_z'] = agent.transform.location.z / 100 #  (cm -> m )
         values['orientation_x'] = agent.transform.orientation.x
         values['orientation_y'] = agent.transform.orientation.y
         values['yaw'] = agent.transform.rotation.yaw

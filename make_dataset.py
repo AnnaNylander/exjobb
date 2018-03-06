@@ -1,15 +1,21 @@
 import os
 import numpy as np
+from lidar_to_topview.main import lidar_to_topview, get_max_elevation
 
 # Define paths to data locations
+ROI = 60
+CELLS = 600
+
 PATH_DATA = '/Users/Jacob/Documents/Datasets/exjobb/recorded_data_2018-03-02'
 PATH_POINT_CLOUDS = PATH_DATA + '/point_cloud'
-PATH_PLAYER = PATH_DATA + '/player_measurements/pm.csv'
+PATH_PLAYER = PATH_DATA + '/player_measurements'
 PATH_STATIC = PATH_DATA + '/static_measurements'
 PATH_DYNAMIC = PATH_DATA + '/dynamic_measurements'
+
 PATH_SAVE = PATH_DATA + '/data_set'
 PATH_INPUT = PATH_SAVE + '/input'
 PATH_OUTPUT = PATH_SAVE + '/output'
+
 N_STEPS_FUTURE = 30
 N_STEPS_PAST = 30
 PRECISION = '%.8f'
@@ -25,32 +31,45 @@ def main():
     corresponds to time step (n+1+k).'''
 
     # Player measurements matrix
-    m_player = np.genfromtxt(PATH_PLAYER, delimiter=' ', skip_header=True)
+    m_player = np.genfromtxt(PATH_PLAYER + '/pm.csv', delimiter=' ', skip_header=True)
     n_frames = np.size(m_player,0)
 
     # for each frame in recorded data
     for frame in range(0,n_frames):
-        #get_input_data(frame, x, y ,yaw, N_STEPS_PAST)
-        # Get x, y and yaw for current frame to make past and future positions
-        # relative to the current position.
-        x, y, yaw = m_player[frame,[2, 3, 11]]
-
-        data_input = get_input(m_player, frame, n_frames, N_STEPS_PAST, x, y, yaw)
-        data_output = get_output(m_player, frame, n_frames, N_STEPS_FUTURE, x, y, yaw)
+        print('Processing frame %i' % frame)
+        data_input = get_input(m_player, frame, n_frames, N_STEPS_PAST)
+        data_output = get_output(m_player, frame, n_frames, N_STEPS_FUTURE)
 
         # Save information about past steps in  a separate csv file
-        filename_input = (PATH_INPUT + '/input_%i.csv') %frame
-        np.savetxt(filename_input, data_input, delimiter=DELIMITER, \
+        filename = (PATH_INPUT + '/values/input_%i.csv') %frame
+        np.savetxt(filename, data_input, delimiter=DELIMITER, \
             header=get_input_header(), comments=COMMENTS, fmt=PRECISION)
 
         # Save information about past steps in  a separate csv file
-        filename_output = (PATH_OUTPUT + '/output_%i.csv') %frame
-        np.savetxt(filename_output, data_output, delimiter=DELIMITER, \
+        filename = (PATH_OUTPUT + '/output_%i.csv') %frame
+        np.savetxt(filename, data_output, delimiter=DELIMITER, \
             header=get_output_header(), comments=COMMENTS, fmt=PRECISION)
 
+        # TODO If we want, we can plot data input as an overlay on the topviews here
 
-def get_input(measurements, frame, n_frames, n_steps, x, y, yaw):
+        filename = PATH_POINT_CLOUDS + '/pc_%i.csv' % (frame + 1)
+        point_cloud = point_cloud = np.loadtxt(filename, delimiter=' ')
+
+        # Save maximum elevation
+        data_max_elevation = get_max_elevation(frame, point_cloud, ROI, CELLS)
+        filename = (PATH_INPUT + '/topviews/max_elevation/me_%i.csv') %frame
+        np.savetxt(filename, data_max_elevation, delimiter=DELIMITER, \
+            comments=COMMENTS, fmt=PRECISION)
+
+        # Save point count
+        #data_count = lidar_to_topview('count', frame, point_cloud, ROI, CELLS)
+        #filename = (PATH_INPUT + '/topviews/count/c_%i.csv') %frame
+        #np.savetxt(filename, data_count, delimiter=DELIMITER, \
+        #    comments=COMMENTS, fmt=PRECISION)
+
+def get_input(measurements, frame, n_frames, n_steps):
     all_inputs = np.zeros([n_steps, 7])
+    x, y, yaw = measurements[frame,[2, 3, 11]]
 
     for past_step in range(0,n_steps):
         # Get index of past frames, i.e. exluding the current frame
@@ -65,14 +84,13 @@ def get_input(measurements, frame, n_frames, n_steps, x, y, yaw):
         v_forward_speed = measurements[frame_index, 8]
         v_steer, v_throttle, v_break = measurements[frame_index, [17, 18, 19]]
 
+        # Insert values in this frame's row
         frame_input = np.zeros(7)
         frame_input[0] = v_rel_x # location x relative to car
         frame_input[1] = v_rel_y # location y relative to car
         frame_input[2] = v_forward_acceleration # forward acceleration
         frame_input[3] = v_forward_speed # forward speed
         frame_input[4] = v_steer # steer
-        #frame_input[5] = v_throttle # throttle
-        #frame_input[6] = v_break # break
         frame_input[5] = 0 # intention direction
         frame_input[6] = 0 # intention proximity
 
@@ -80,8 +98,9 @@ def get_input(measurements, frame, n_frames, n_steps, x, y, yaw):
 
     return all_inputs
 
-def get_output(measurements, frame, n_frames, n_steps, x, y, yaw):
+def get_output(measurements, frame, n_frames, n_steps):
     data_output = np.zeros([n_steps, 2])
+    x, y, yaw = measurements[frame,[2, 3, 11]]
 
     for future_step in range(0,n_steps):
         # Get index of future frames, i.e. exluding the current frame
@@ -96,12 +115,11 @@ def get_output(measurements, frame, n_frames, n_steps, x, y, yaw):
     return data_output
 
 def get_relative_location(x, y, yaw, new_x, new_y):
-    rel_x = new_x - x
-    rel_y = new_y - y
-    # Rotate so heading of car in frame t is upwards
-    rel = rotate(rel_x, rel_y, -np.sign(yaw)*yaw + 90)
-
-
+    # Shift locations so that location in current frame (x,y) is in origo
+    relative_x = new_x - x
+    relative_y = new_y - y
+    # Rotate so heading of car in current frame is upwards
+    rel = rotate(relative_x, relative_y, -np.sign(yaw)*yaw + 90)
     return rel[0,0], rel[0,1]
 
 def get_forward_acceleration(acc_x, acc_y, acc_z):
@@ -115,8 +133,6 @@ def get_input_header():
     header.append('forward_acceleration')
     header.append('forward_speed')
     header.append('steer')
-    header.append('throttle')
-    header.append('brake')
     header.append('intention_direction')
     header.append('intention_proximity')
     return DELIMITER.join(header)
