@@ -2,19 +2,29 @@ import os
 import numpy as np
 from lidar_to_topview.main import lidar_to_topview, get_max_elevation
 
+parser = argparse.ArgumentParser(description='Plot positions relative to car')
+parser.add_argument('--step', metavar='n', type=int,
+                    dest='timeStep', default=0,
+                    help='Time step (frame index) to plot as current frame.')
+parser.add_argument('--save-path', metavar='path',
+                    dest='SAVE_PATH', default='/dataset',
+                    help='Where to save the dataset')
+parser.add_argument('--data-path', metavar='path',
+                    dest='DATA_PATH', default='/',
+                    help='Where to fetch the recorded data')
+args = parser.parse_args()
+
 # Define paths to data locations
 ROI = 60
 CELLS = 600
 
-PATH_DATA = '/Users/Jacob/Documents/Datasets/exjobb/recorded_data_2018-03-02'
-PATH_POINT_CLOUDS = PATH_DATA + '/point_cloud'
-PATH_PLAYER = PATH_DATA + '/player_measurements'
-PATH_STATIC = PATH_DATA + '/static_measurements'
-PATH_DYNAMIC = PATH_DATA + '/dynamic_measurements'
+PATH_POINT_CLOUDS =  args.DATA_PATH + '/point_cloud'
+PATH_PLAYER = args.DATA_PATH + '/player_measurements'
+#PATH_STATIC = args.DATA_PATH + '/static_measurements'
+#PATH_DYNAMIC = args.DATA_PATH + '/dynamic_measurements'
 
-PATH_SAVE = PATH_DATA + '/data_set'
-PATH_INPUT = PATH_SAVE + '/input'
-PATH_OUTPUT = PATH_SAVE + '/output'
+PATH_INPUT = args.SAVE_PATH + '/input'
+PATH_OUTPUT = args.SAVE_PATH + '/output'
 
 N_STEPS_FUTURE = 30
 N_STEPS_PAST = 30
@@ -29,6 +39,14 @@ def main():
     row k corresponds to time step (n-1-k). Row indices are assumed to begin with 0.
     For the output, N_STEPS_FUTURE steps are gathered similarly, where row k
     corresponds to time step (n+1+k).'''
+
+    # Create directories
+    if not os.path.exists(PATH_SAVE):
+        os.makedirs(PATH_SAVE)
+    if not os.path.exists(PATH_INPUT):
+        os.makedirs(PATH_INPUT)
+    if not os.path.exists(PATH_OUTPUT):
+        os.makedirs(PATH_OUTPUT)
 
     # Player measurements matrix
     m_player = np.genfromtxt(PATH_PLAYER + '/pm.csv', delimiter=' ', skip_header=True)

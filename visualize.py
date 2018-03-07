@@ -14,7 +14,7 @@ SUBPLOT_COLS = 2
 
 parser = argparse.ArgumentParser(description='Plot positions relative to car')
 parser.add_argument('--step', metavar='integer', type=int,
-                    dest='timeStep', default='0',
+                    dest='timeStep', default=0,
                     help='Time step (frame index) to plot as current fram.')
 
 args = parser.parse_args()

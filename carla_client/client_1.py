@@ -25,13 +25,57 @@ import save_util as saver
 from collections import defaultdict
 import datetime
 
-N_FRAMES = 10   # Set number of frames in episode
-SAVE_PATH = '/home/annaochjacob/Documents/recorded_data'
-SAVE_PATH_PLAYER = SAVE_PATH + '/player_measurements'
-SAVE_PATH_STATIC = SAVE_PATH + '/static_measurements'
-SAVE_PATH_DYNAMIC = SAVE_PATH + '/dynamic_measurements'
-SAVE_PATH_POINT_CLOUD = SAVE_PATH + '/point_cloud'
+argparser = argparse.ArgumentParser(description=__doc__)
+argparser.add_argument(
+    '-v', '--verbose',
+    action='store_true',
+    dest='debug',
+    help='print debug information')
+argparser.add_argument(
+    '--host',
+    metavar='H',
+    default='localhost',
+    help='IP of the host server (default: localhost)')
+argparser.add_argument(
+    '-p', '--port',
+    metavar='P',
+    default=2000,
+    type=int,
+    help='TCP port to listen to (default: 2000)')
+argparser.add_argument(
+    '-a', '--autopilot',
+    action='store_true',
+    help='enable autopilot')
+argparser.add_argument(
+    '-i', '--images-to-disk',
+    action='store_true',
+    help='save images to disk')
+argparser.add_argument(
+    '-c', '--carla-settings',
+    metavar='PATH',
+    default=None,
+    help='Path to a "CarlaSettings.ini" file')
+argparser.add_argument(
+    '--frames',
+    default=100,
+    type=int,
+    dest='frames',
+    help='Number of frames to run the client')
+argparser.add_argument(
+    '--save-path',
+    metavar='PATH',
+    default='/recorded_data',
+    dest='save_path',
+    help='Number of frames to run the client')
+
+args = argparser.parse_args()
+
+SAVE_PATH_PLAYER = args.save_path + '/player_measurements'
+SAVE_PATH_STATIC = args.save_path + '/static_measurements'
+SAVE_PATH_DYNAMIC = args.save_path + '/dynamic_measurements'
+SAVE_PATH_POINT_CLOUD = args.save_path + '/point_cloud'
 MOVING_AVERAGE_LENGTH = 10
+
 
 def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filename_format, settings_filepath):
 
@@ -101,16 +145,16 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
 
         episode_start = datetime.datetime.now()
         print("Episode started %s" % episode_start.strftime("%Y-%m-%d %H:%M"))
-        print("Space required: %.2fGB" %(N_FRAMES*1.1/1024))
+        print("Space required: %.2fGB" %(args.frames*1.1/1024))
         print("---------------------------------------------------------------")
         # Create placeholders for measurement values
-        player_values = np.zeros([N_FRAMES,22])
+        player_values = np.zeros([args.frames,22])
         dynamic_values = defaultdict(list)
 
         frame_durations = MOVING_AVERAGE_LENGTH * [0]
 
         # Iterate every frame in the episode.
-        for frame in range(1,N_FRAMES + 1):
+        for frame in range(0,args.frames):
             # Time processing of each frame to estimate episode duration
             start = time.time()
 
@@ -172,7 +216,7 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
             elapsed_time = stop - start
             frame_durations[frame%MOVING_AVERAGE_LENGTH] = elapsed_time
             average_time = np.mean(frame_durations)
-            time_left = average_time * (N_FRAMES-frame)
+            time_left = average_time * (args.frames-frame)
             m, s = divmod(time_left, 60)
             h, m = divmod(m, 60)
             print("Frame %i - ETA %02d:%02d:%02d" % (frame, h, m, s))
@@ -208,38 +252,16 @@ def print_measurements(measurements):
 
 
 def main():
-    argparser = argparse.ArgumentParser(description=__doc__)
-    argparser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        dest='debug',
-        help='print debug information')
-    argparser.add_argument(
-        '--host',
-        metavar='H',
-        default='localhost',
-        help='IP of the host server (default: localhost)')
-    argparser.add_argument(
-        '-p', '--port',
-        metavar='P',
-        default=2000,
-        type=int,
-        help='TCP port to listen to (default: 2000)')
-    argparser.add_argument(
-        '-a', '--autopilot',
-        action='store_true',
-        help='enable autopilot')
-    argparser.add_argument(
-        '-i', '--images-to-disk',
-        action='store_true',
-        help='save images to disk')
-    argparser.add_argument(
-        '-c', '--carla-settings',
-        metavar='PATH',
-        default=None,
-        help='Path to a "CarlaSettings.ini" file')
+    # Create directories
+    if not os.path.exists(SAVE_PATH_PLAYER):
+        os.makedirs(SAVE_PATH_PLAYER)
+    if not os.path.exists(SAVE_PATH_STATIC):
+        os.makedirs(SAVE_PATH_STATIC)
+    if not os.path.exists(SAVE_PATH_DYNAMIC):
+        os.makedirs(SAVE_PATH_DYNAMIC)
+    if not os.path.exists(SAVE_PATH_POINT_CLOUD):
+        os.makedirs(SAVE_PATH_POINT_CLOUD)
 
-    args = argparser.parse_args()
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)

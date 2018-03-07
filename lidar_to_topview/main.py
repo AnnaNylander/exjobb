@@ -1,6 +1,9 @@
 import numpy as np
 from PIL import Image
 
+ELEVATION_MAX = 6
+ELEVATION_MIN = -18
+
 #point_cloud = np.loadtxt('data/hej.csv', delimiter=' ')
 #point_cloud = trim_to_roi(point_cloud,ROI)
 
@@ -40,7 +43,7 @@ def get_max_elevation(frame, point_cloud, ROI, CELLS):
              grid[cell_x,cell_y] = z
 
     grid = np.nan_to_num(grid) # Replace all nans with zeros
-    grid = grid/(np.max(grid) - np.min(grid))
+    grid = grid/(ELEVATION_MAX - ELEVATION_MIN)
     grid = grid + 0.5
     return np.uint8(grid*255)
 
