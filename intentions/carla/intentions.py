@@ -4,7 +4,7 @@ import argparse
 import math
 from util import getEulerDistance, isWithinRadius
 
-RADIUS = 3
+RADIUS = 4
 
 def getTrueDistance(car_data, start_pos, end_pos):
     sumDistance = 0
@@ -26,7 +26,7 @@ def getNextJson(index,data, position):
             data['endPosition']['data'])
 
     values = data['values'][index]
-    return ((float(values['location_y']/100), float(values['location_x']/100)),values['data'])
+    return ((float(values['location_y']), float(values['location_x'])),values['data'])
 
 def getData(car_data, json_data):
     """used for turn intentions"""
@@ -101,16 +101,9 @@ def getDataTraffic(car_data, json_data, dynamic_data):
         next_speed_limit = None
         if isTrafficLight:
             id = str(int(next_value['id']))
-            color = dynamic_data[id][frame]
-            if color == 0:
-                light_status = "green"
-            if color == 1:
-                light_status = "yellow"
-            if color == 2:
-                light_status = "red"
+            light_status = dynamic_data[id][frame]
         elif not isEnd:
             next_speed_limit = next_value['speed_limit']
-
         values = {'current_speed_limit':current_speed_limit,'next_speed_limit':next_speed_limit,'light_status':light_status}
         if isEnd:
             values = {'current_speed_limit':current_speed_limit,'next_speed_limit':None,'light_status':None}

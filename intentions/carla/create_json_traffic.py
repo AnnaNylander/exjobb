@@ -22,12 +22,12 @@ parser.add_argument('--jsonfile', metavar='file.json', dest='jsonfile',
 
 args = parser.parse_args()
 
-RADIUS = 2
+RADIUS = 4
 
 def findRelevantTrafficSigns(static_data, car_position, car_yaw):
     result = []
     for row in static_data:
-        sign_position = (row['location_y']/100,row['location_x']/100)
+        sign_position = (row['location_y'],row['location_x'])
         sign_yaw = row['yaw']
         if isWithinRadius(car_position, sign_position, RADIUS) and isVisible(car_yaw, sign_yaw):
             print(car_position)
@@ -69,7 +69,6 @@ def create_json():
         if sign == id:
             continue
         signs.append(sign)
-        print(sign==id)
         id = sign
 
     data['values'] = []
@@ -79,7 +78,6 @@ def create_json():
         y_pos = static_data['location_y'][index][0]
         type = static_data['type'][index][0]
         type = "light" if type==3 else "sign"
-        print(type)
         values = { 'id': id, 'type': type , 'speed_limit': static_data['speed_limit'][index][0]}
         data['values'].append({'location_x': x_pos, 'location_y': y_pos, \
             'data':values})

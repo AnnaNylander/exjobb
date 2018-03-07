@@ -46,14 +46,20 @@ def create_json():
         if frame in values:
             location_y = row['location_y']
             location_x = row['location_x']
+            direction = values[frame]
+            dir = 0
+            if direction == 'left':
+                dir = -1
+            if direction =='right':
+                dir = 1
             data['values'].append({'location_x': location_x, 'location_y': location_y, \
-                'data':{'type': values[frame]}})
+                'data':{'type': dir}})
         last_row = row
         frame = frame+1
 
     location_y = last_row['location_y']
     location_x = last_row['location_x']
-    data['endPosition'] = {'location_x': location_x, 'location_y': location_y, 'data':{'type':'end'}}
+    data['endPosition'] = {'location_x': location_x, 'location_y': location_y, 'data':{'type':0}}
 
     with open(args.jsonfile,"w") as f:
         json.dump(data,f, sort_keys=False, indent=4, separators=(',', ': '))

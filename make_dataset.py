@@ -1,16 +1,14 @@
 import os
 import numpy as np
+import argparse
 from lidar_to_topview.main import lidar_to_topview, get_max_elevation
 
 parser = argparse.ArgumentParser(description='Plot positions relative to car')
-parser.add_argument('--step', metavar='n', type=int,
-                    dest='timeStep', default=0,
-                    help='Time step (frame index) to plot as current frame.')
 parser.add_argument('--save-path', metavar='path',
-                    dest='SAVE_PATH', default='/dataset',
+                    dest='SAVE_PATH', default='dataset',
                     help='Where to save the dataset')
 parser.add_argument('--data-path', metavar='path',
-                    dest='DATA_PATH', default='/',
+                    dest='DATA_PATH', default='recorded_data',
                     help='Where to fetch the recorded data')
 args = parser.parse_args()
 
@@ -20,8 +18,8 @@ CELLS = 600
 
 PATH_POINT_CLOUDS =  args.DATA_PATH + '/point_cloud'
 PATH_PLAYER = args.DATA_PATH + '/player_measurements'
-#PATH_STATIC = args.DATA_PATH + '/static_measurements'
-#PATH_DYNAMIC = args.DATA_PATH + '/dynamic_measurements'
+PATH_INTENTIONS = args.DATA_PATH + '/intentions'
+PATH_TRAFFIC = args.DATA_PATH + '/traffic_awareness'
 
 PATH_INPUT = args.SAVE_PATH + '/input'
 PATH_OUTPUT = args.SAVE_PATH + '/output'
@@ -41,21 +39,30 @@ def main():
     corresponds to time step (n+1+k).'''
 
     # Create directories
-    if not os.path.exists(PATH_SAVE):
-        os.makedirs(PATH_SAVE)
+    if not os.path.exists(args.SAVE_PATH):
+        os.makedirs(args.SAVE_PATH)
     if not os.path.exists(PATH_INPUT):
         os.makedirs(PATH_INPUT)
+    if not os.path.exists(PATH_INPUT + "/values"):
+        os.makedirs(PATH_INPUT + "/values")
+    if not os.path.exists(PATH_INPUT + "/topviews"):
+        os.makedirs(PATH_INPUT + "/topviews")
+    if not os.path.exists(PATH_INPUT + "/topviews/max_elevation"):
+        os.makedirs(PATH_INPUT + "/topviews/max_elevation")
     if not os.path.exists(PATH_OUTPUT):
         os.makedirs(PATH_OUTPUT)
 
     # Player measurements matrix
-    m_player = np.genfromtxt(PATH_PLAYER + '/pm.csv', delimiter=' ', skip_header=True)
+    m_player = np.genfromtxt(PATH_PLAYER + '/pm.csv', delimiter=',', skip_header=True)
+    m_intentions = np.genfromtxt(PATH_INTENTIONS + '/data.csv', delimiter =',', names=True)
+    m_traffic = np.genfromtxt(PATH_TRAFFIC + '/data.csv', delimiter=',', names=True)
     n_frames = np.size(m_player,0)
+    #m_traffic_csvreader = csv.reader()
 
     # for each frame in recorded data
     for frame in range(0,n_frames):
         print('Processing frame %i' % frame)
-        data_input = get_input(m_player, frame, n_frames, N_STEPS_PAST)
+        data_input = get_input(m_player, m_intentions, m_traffic, frame, n_frames, N_STEPS_PAST)
         data_output = get_output(m_player, frame, n_frames, N_STEPS_FUTURE)
 
         # Save information about past steps in  a separate csv file
@@ -71,7 +78,7 @@ def main():
         # TODO If we want, we can plot data input as an overlay on the topviews here
 
         filename = PATH_POINT_CLOUDS + '/pc_%i.csv' % (frame + 1)
-        point_cloud = point_cloud = np.loadtxt(filename, delimiter=' ')
+        point_cloud = point_cloud = np.loadtxt(filename, delimiter=',')
 
         # Save maximum elevation
         data_max_elevation = get_max_elevation(frame, point_cloud, ROI, CELLS)
@@ -85,8 +92,8 @@ def main():
         #np.savetxt(filename, data_count, delimiter=DELIMITER, \
         #    comments=COMMENTS, fmt=PRECISION)
 
-def get_input(measurements, frame, n_frames, n_steps):
-    all_inputs = np.zeros([n_steps, 7])
+def get_input(measurements, intentions, traffic, frame, n_frames, n_steps):
+    all_inputs = np.zeros([n_steps, 11])
     x, y, yaw = measurements[frame,[2, 3, 11]]
 
     for past_step in range(0,n_steps):
@@ -103,14 +110,19 @@ def get_input(measurements, frame, n_frames, n_steps):
         v_steer, v_throttle, v_break = measurements[frame_index, [17, 18, 19]]
 
         # Insert values in this frame's row
-        frame_input = np.zeros(7)
+        frame_input = np.zeros(11)
         frame_input[0] = v_rel_x # location x relative to car
         frame_input[1] = v_rel_y # location y relative to car
         frame_input[2] = v_forward_acceleration # forward acceleration
         frame_input[3] = v_forward_speed # forward speed
         frame_input[4] = v_steer # steer
-        frame_input[5] = 0 # intention direction
-        frame_input[6] = 0 # intention proximity
+        frame_input[5] = intentions['intention_direction'][frame] # intention direction
+        frame_input[6] = intentions['intention_proximity'][frame] # intention
+        frame_input[7] = traffic['next_distance'][frame] # next_traffic_object_proximity
+        frame_input[8] = traffic['current_speed_limit'][frame] # current_speed_limit
+        frame_input[9] = traffic['next_speed_limit'][frame] # next_speed_limit (MIGHT BE NULL!)
+        frame_input[10] = traffic['light_status'][frame] # traffic light status (MIGHT BE NULL!)
+
 
         all_inputs[past_step,:] = np.transpose(frame_input)
 
@@ -153,6 +165,10 @@ def get_input_header():
     header.append('steer')
     header.append('intention_direction')
     header.append('intention_proximity')
+    header.append('next_distance')
+    header.append('current_speed_limit')
+    header.append('next_speed_limit')
+    header.append('light_status')
     return DELIMITER.join(header)
 
 def get_output_header():
