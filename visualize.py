@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import argparse
 from lidar_to_topview.main import lidar_to_topview, get_max_elevation
@@ -57,8 +58,10 @@ def main():
 
 def plot(x, y ,c , image ,subplot_rows, subplot_cols, subplot_index, title, side):
     plt.subplot(subplot_rows, subplot_cols, subplot_index)
-    plt.imshow(image, cmap='gray', extent=[-side/2, side/2, -side/2, side/2])
-    future_plot = plt.scatter(x, y, marker='.', c=c)
+    plt.imshow(image, cmap='gray', extent=[-side/2, side/2, -side/2, side/2], \
+        interpolation='bilinear')
+    cmap = matplotlib.cm.Greys
+    future_plot = plt.scatter(x, y, marker='.', c=c, cmap=cmap)
     fig = plt.gcf()
     #plt.legend((future_plot, past_plot),('Future','Past'))
     axes = fig.gca()
