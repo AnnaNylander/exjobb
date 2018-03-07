@@ -47,11 +47,11 @@ def main():
     SUBPLOT_COLS, 1,'Past and future path',SIDE)
     plot(past_loc_x, past_loc_y, 'r', topview_img, SUBPLOT_ROWS, \
         SUBPLOT_COLS, 1,'Past and future path',SIDE)
-    plot(future_loc_x, future_loc_y, past_fwd_acc, topview_img, SUBPLOT_ROWS, \
+    plot(past_loc_x, past_loc_y, past_fwd_acc, topview_img, SUBPLOT_ROWS, \
         SUBPLOT_COLS, 2,'Forward acceleration',SIDE)
-    plot(future_loc_x, future_loc_y, past_fwd_speed, topview_img, SUBPLOT_ROWS, \
+    plot(past_loc_x, past_loc_y, past_fwd_speed, topview_img, SUBPLOT_ROWS, \
         SUBPLOT_COLS, 3,'Forward speed',SIDE)
-    plot(future_loc_x, future_loc_y, past_steer, topview_img, SUBPLOT_ROWS, \
+    plot(past_loc_x, past_loc_y, past_steer, topview_img, SUBPLOT_ROWS, \
         SUBPLOT_COLS, 4,'Steer',SIDE)
 
     plt.show()
