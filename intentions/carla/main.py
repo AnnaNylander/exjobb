@@ -2,99 +2,71 @@ import csv
 import json
 import argparse
 import math
+import numpy
+from intentions import getData, getDataTraffic
 
 parser = argparse.ArgumentParser(description='Calculate intentions')
-parser.add_argument('--csvfile', metavar='file.csv', dest='csvfile',
-                    default='test_data.csv',
-                    help='input file containing postion of car')
-parser.add_argument('--jsonfile', metavar='file.json', dest='jsonfile',
-                    default='path.json',
+parser.add_argument('--jsonIntentions', metavar='file.json', dest='jsonIntentions',
+                    default='../../recorded_data/intentions/intentions.json',
                     help='input file containing the path with turns.')
-parser.add_argument('--targetFile', metavar='file.csv', dest='targetFile',
-                    default='intentions.csv',
-                    help='output file')
-parser.add_argument('--latKey', metavar='key', dest='latkey',
-                    default='location_y',
-                    help='csv key to latitude coordinates')
-parser.add_argument('--lonKey', metavar='key', dest='lonkey',
-                    default='location_x',
-                    help='csv key to longitude coordinates')
+parser.add_argument('--jsonTraffic', metavar='file.json', dest='jsonTraffic',
+                    default='../../recorded_data/traffic_awareness/traffic.json',
+                    help='input file containing traffic situation along the path.')
+parser.add_argument('--dynamicfile', metavar='file.csv', dest='dynamicfile',
+                    default='../../recorded_data/dynamic_measurements/dm.csv',
+                    help='file containing dynamic information on traffic lights')
+parser.add_argument('--csvfile', metavar='file.csv', dest='csvfile',
+                    default='../../recorded_data/player_measurements/pm.csv',
+                    help='input file containing information on the car.')
+parser.add_argument('--targetIntentions', metavar='file.csv', dest='targetIntentions',
+                    default='../../recorded_data/intentions/data.csv',
+                    help='output file for intentions')
+parser.add_argument('--targetTraffic', metavar='file.csv', dest='targetTraffic',
+                    default='../../recorded_data/traffic_awareness/data.csv',
+                    help='output file traffic awareness')
 
 args = parser.parse_args()
 
-def getDistance(startTime, start_pos, end_pos): #TODO every 5 seconds or something instead
-    csvreader = csv.DictReader(open(args.csvfile), delimiter=' ')
-    interval =  1000 # every one seconds
-    sumDistance = 0
-    last_position = start_pos
-    for row in csvreader:
-        t = float (row['game_timestamp'])
-        current_position = (float(row[args.latkey]), float(row[args.lonkey]))
-        if end_pos == current_position:
-            sumDistance = sumDistance + getHypotenuseDistance(last_position, current_position)
-            return sumDistance
-        if t > startTime and (t-startTime) % interval == 0:
-            sumDistance = sumDistance + getHypotenuseDistance(last_position, current_position)
-            last_position = current_position
-
-
-
-def getHypotenuseDistance(a, b): #TODO every 5 seconds or something instead
-    (a_lat,a_lon) = a
-    (b_lat,b_lon) = b
-    dist = math.sqrt((b_lat - a_lat)**2 + (b_lon - a_lon)**2)
-    return dist
-
-def getNextTurn(position):
-    (lat,lon) = position
-    global turn_index #TODO is this correct syntax?? :s
-    if turn_index == max_turn:
-        return ((float (data['endPosition']['latitude']),float (data['endPosition']['longitude'])),"end")
-
-    turn = data['turns'][turn_index]
-    turn_index = turn_index + 1
-    return ((float(turn['latitude']), float(turn['longitude'])),turn['type'])
-
-def getIntentions():
+def main():
     """ Read GPS-IMU values from csv file and calculate intentions.
-    Then write the intentions to a new csv file."""
-    csvreader = csv.DictReader(open(args.csvfile), delimiter=' ')
-    print("Reading from " + args.csvfile + " and calculating intentions." +\
-            " Writing to " + args.targetFile)
-    csvwriter = csv.writer(open(args.targetFile, 'w', newline=''), delimiter=';')
-    csvwriter.writerow(['frame','intention_direction', 'intention_proximity'])
+    Then write the intentions to a new csv file. Also writing traffic intentions."""
 
-    #init values
-    next_turn_pos = None
-    next_turn_type = ""
-    frame = 1
-    next_turn_distance = 0
-    last_position = None
-    for row in csvreader:
-        current_position = (float(row[args.latkey]), float(row[args.lonkey]))
-        time = float (row['game_timestamp'])
-        if last_position == None:
-            last_position = (float(row[args.latkey]), float(row[args.lonkey]))
-        if (next_turn_pos == None or current_position == next_turn_pos):
-            next_turn_pos, next_turn_type = getNextTurn(current_position)
-            next_turn_distance = getDistance(time, current_position, next_turn_pos)
+    print("****** GENERATING INTENTIONS ******")
+    print("Reading car information from " + args.csvfile +\
+            "\nreading path from" + args.jsonIntentions)
+    car_data = numpy.genfromtxt(args.csvfile, delimiter=',', names=True)
+    json_data = json.load(open(args.jsonIntentions))
 
-        # get updated turn proximity
-        next_turn_distance = next_turn_distance - getHypotenuseDistance(last_position, current_position)
-        next_turn_distance = max(next_turn_distance, 0)
-        intention_proximity = next_turn_distance
-        intention_type = next_turn_type
+    print("Preparing to write to: " + args.targetIntentions)
+    csvwriter = csv.writer(open(args.targetIntentions, 'w', newline=''), delimiter=',')
+    csvwriter.writerow(['frame','intention_proximity','intention_direction'])
 
-        csvwriter.writerow([frame, intention_type, round(intention_proximity)])
-        frame = frame+1
-        last_position = current_position
+    data = getData(car_data, json_data)
+
+    print("Intentions generated. Writing to csv file.")
+    for row in data:
+        csvwriter.writerow([row[0],round(row[1])] + list(row[2].values()))
+    print("Intentions written.")
+
+    print("****** GENERATING TRAFFIC AWARENESS ******")
+    print("Reading car information from " + args.csvfile +\
+            "\nreading path from " + args.jsonTraffic +\
+            "\nreading current traffic status from " + args.dynamicfile)
+    car_data = numpy.genfromtxt(args.csvfile, delimiter=',', names=True)
+    json_data = json.load(open(args.jsonTraffic))
+    dynamic_data = numpy.genfromtxt(args.dynamicfile, delimiter=',', names=True)
+
+    print("Preparing to write to: " + args.targetTraffic)
+    csvwriter = csv.writer(open(args.targetTraffic, 'w', newline=''), delimiter=',')
+    csvwriter.writerow(['frame','next_distance', 'current_speed_limit','next_speed_limit','light_status'])
+
+    data = getDataTraffic(car_data, json_data, dynamic_data)
+
+    print("Intentions generated. Writing to csv file.")
+    for row in data:
+        csvwriter.writerow([row[0],round(row[1])] + list(row[2].values()))
+    print("Traffic situation written.")
 
 
 if __name__=="__main__":
-    global max_turn
-    global turn_index
-    global data
-    turn_index = 0
-    data = json.load(open(args.jsonfile))
-    max_turn = len(data['turns'])
-    getIntentions()
+    main()
