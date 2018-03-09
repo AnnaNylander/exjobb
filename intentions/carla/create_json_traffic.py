@@ -6,19 +6,8 @@ import numpy
 from util import getEulerDistance, isWithinRadius
 
 parser = argparse.ArgumentParser(description='Create json file')
-parser.add_argument('--staticfile', metavar='file.csv', dest='staticfile',
-                    default='../../recorded_data/static_measurements/sm.csv',
-                    help='file containing static information on speed signs\
-                     and traffic lights')
-parser.add_argument('--dynamicfile', metavar='file.csv', dest='dynamicfile',
-                    default='../../recorded_data/dynamic_measurements/dm.csv',
-                    help='file containing dynamic information on traffic lights')
-parser.add_argument('--csvfile', metavar='file.csv', dest='csvfile',
-                    default='../../recorded_data/player_measurements/pm.csv',
-                    help='input file containing postion of car')
-parser.add_argument('--jsonfile', metavar='file.json', dest='jsonfile',
-                    default='../../recorded_data/traffic_awareness/traffic.json',
-                    help='input file containing the path with turns.')
+parser.add_argument('--path', metavar='PATH', dest='path',
+                    help='path to recorded_data.')
 
 args = parser.parse_args()
 
@@ -30,28 +19,31 @@ def findRelevantTrafficSigns(static_data, car_position, car_yaw):
         sign_position = (row['location_y'],row['location_x'])
         sign_yaw = row['yaw']
         if isWithinRadius(car_position, sign_position, RADIUS) and isVisible(car_yaw, sign_yaw):
-            print(car_position)
             result.append(row['id'])
     return result
 
 def isVisible(a, b):
     #-180 till + 180 för båda. De ska vara abs(a-b)> 90
     boolean = math.fabs(a-b) > 90
-    print(boolean)
     return boolean
 
 
-def create_json():
-    print("Reading car information from " + args.csvfile +\
-            "\nReading static information from " + args.staticfile +\
-            "\nReading dynamic information from " + args.dynamicfile +\
-            "\nWriting to " + args.jsonfile)
+def create_json(args):
+    DYNAMIC_PATH = args.path + 'dynamic_measurements/dm.csv'
+    STATIC_PATH = args.path + 'static_measurements/sm.csv'
+    CSVFILE_PATH = args.path + 'player_measurements/pm.csv'
+    JSON_PATH = args.path + 'traffic_awareness/traffic.json'
+
+    print("Reading car information from " + CSVFILE_PATH +\
+            "\nReading static information from " + STATIC_PATH +\
+            "\nReading dynamic information from " + DYNAMIC_PATH +\
+            "\nWriting to " + JSON_PATH)
 
     #read data
-    static_data = numpy.genfromtxt(args.staticfile, delimiter=',', names=True)
-    dynamic_data = numpy.genfromtxt(args.dynamicfile, delimiter=',', names=True)
-    car_data = numpy.genfromtxt(args.csvfile, delimiter=',', names=True)
-    #json_data = json.load(open(args.jsonfile))
+    static_data = numpy.genfromtxt(STATIC_PATH, delimiter=',', names=True)
+    dynamic_data = numpy.genfromtxt(DYNAMIC_PATH, delimiter=',', names=True)
+    car_data = numpy.genfromtxt(CSVFILE_PATH, delimiter=',', names=True)
+    #json_data = json.load(open(JSON_PATH))
 
     data = dict()
 
@@ -77,7 +69,6 @@ def create_json():
         x_pos = static_data['location_x'][index][0]
         y_pos = static_data['location_y'][index][0]
         type = static_data['type'][index][0]
-        type = "light" if type==3 else "sign"
         values = { 'id': id, 'type': type , 'speed_limit': static_data['speed_limit'][index][0]}
         data['values'].append({'location_x': x_pos, 'location_y': y_pos, \
             'data':values})
@@ -85,16 +76,11 @@ def create_json():
     last_row = car_data[len(car_data)-1]
     location_y = last_row['location_y']
     location_x = last_row['location_x']
-    data['endPosition'] = {'location_x': location_x, 'location_y': location_y, 'data':{'id': 0, 'type':'end', 'speed_limit':0}}
-    #traffic sign data: position, id, limit after, limit up until?
-    #traffic light data: position, id, status??
-
-    # should I make one for signs and one for TL or one together?
-    print(data)
+    data['endPosition'] = {'location_x': location_x, 'location_y': location_y, 'data':{'id': 0, 'type':0, 'speed_limit':0}}
 
 
-    with open(args.jsonfile,"w") as f:
+    with open(JSON_PATH,"w") as f:
         json.dump(data,f, sort_keys=False, indent=4, separators=(',', ': '))
 
 if __name__=="__main__":
-    create_json()
+    create_json(args)

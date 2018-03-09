@@ -23,4 +23,4 @@ class OurDataset(Dataset):
         return len(self.outputs)
 
     def __getitem__(self, idx):
-        return {'lidar': self.lidars[idx], 'values': self.values[idx], 'outputs': self.outputs[idx]}
+        return {'lidar': self.lidars[idx], 'value': self.values[idx], 'output': self.outputs[idx]}

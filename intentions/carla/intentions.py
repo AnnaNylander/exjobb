@@ -86,11 +86,11 @@ def getDataTraffic(car_data, json_data, dynamic_data):
             next_pos, next_value = getNextJson(json_index,json_data, current_position)
             json_index = json_index+1
             next_distance = getTrueDistance(car_data[frame:len(car_data)], current_position, next_pos)
-            if next_value['type'] == 'light':
+            if next_value['type'] == 3:
                 isTrafficLight = True
             else:
                 isTrafficLight = False
-            if next_value['type'] == 'end':
+            if next_value['type'] == 0:
                 isEnd = True
 
         # get updated turn proximity

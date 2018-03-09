@@ -29,6 +29,9 @@ parser.add_argument('--print-freq', '-p', default=100, type=int,
                     metavar='N', help='print frequency (default: 100)')
 parser.add_argument('--dataset', dest='dataset_path', default='./dataset/',
                     type=str, metavar='PATH', help = 'path to dataset folder.')
+parser.add_argument('--save-path', dest='save-path', default='./saved/',
+                    type=str, metavar='PATH', help = 'path to where to save models.')
+
 
 # TODO variate learning_rate depending on epoch.
 # TODO save checkpoints
@@ -46,7 +49,7 @@ def main():
     # load all time best
     print("-----Load all time best loss (for comparision)-----")
     all_time_best_res = 10000 # big number
-    all_time_best = load_checkpoint('saved/all_time_best.pt')
+    all_time_best = load_checkpoint( args.save-path + 'all_time_best.pt')
     if all_time_best is not None:
         all_time_best_res = all_time_best['best_res']
         print("avg loss @:",all_time_best_res)
@@ -76,9 +79,9 @@ def main():
 
     # Load datasets
     print("-----Loading datasets-----")
-    train_dataset = OurDataset(getData(args.dataset_path + 'train'))
-    validate_dataset = OurDataset(getData(args.dataset_path + 'validate'))
-    test_dataset = OurDataset(getData(args.dataset_path + 'test'))
+    train_dataset = OurDataset(getData(args.dataset_path + 'train/'))
+    validate_dataset = OurDataset(getData(args.dataset_path + 'validate/'))
+    test_dataset = OurDataset(getData(args.dataset_path + 'test/'))
 
     dataloader_train= DataLoader(train_dataset, batch_size=args.batch_size,
                     shuffle=True, num_workers=4)
@@ -131,10 +134,12 @@ def train(model, dataloader, loss_fn, optimizer, epoch):
     start = time.time()
     for i, batch in enumerate(dataloader):
 
-        inputs = Variable((batch['image']).type(torch.cuda.FloatTensor))
-        targets = Variable((batch['label']).type(torch.cuda.FloatTensor))
+        lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor))
+        values = Variable((batch['value']).type(torch.cuda.FloatTensor))
+        targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
+        targets = targets.view(-1, 60)
 
-        output = model(inputs)
+        output = model(lidars, values)
         loss = loss_fn(output, targets)
 
         optimizer.zero_grad() # reset gradients
@@ -160,10 +165,12 @@ def validate(model, dataloader, loss_fn):
 
     start = time.time()
     for i, batch in enumerate(dataloader):
-        inputs = Variable((batch['image']).type(torch.cuda.FloatTensor))
-        targets = Variable((batch['label']).type(torch.cuda.FloatTensor))
+        lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor))
+        values = Variable((batch['value']).type(torch.cuda.FloatTensor))
+        targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
+        targets = targets.view(-1, 60)
 
-        output = model(inputs)
+        output = model(lidars, values)
         loss = loss_fn(output, targets)
 
         # document result
@@ -186,14 +193,14 @@ def validate(model, dataloader, loss_fn):
 
 
 def save_checkpoint(state, is_best, is_all_time_best,
-        filename = 'saved/checkpoint.pt'):
+        filename = args.save-path + 'checkpoint.pt'):
     torch.save(state, filename)
     if is_best:
         print("Best thus far!")
-        shutil.copyfile(filename, 'saved/best.pt')
+        shutil.copyfile(filename, args.save-path + 'best.pt')
     if is_all_time_best:
         print("ALL TIME BEST! GOOD JOB!")
-        shutil.copyfile(filename, 'saved/all_time_best.pt')
+        shutil.copyfile(filename, args.save-path + 'all_time_best.pt')
     print("\n")
 
 def load_checkpoint(filename):

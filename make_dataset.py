@@ -2,6 +2,7 @@ import os
 import numpy as np
 import argparse
 from lidar_to_topview.main import lidar_to_topview, get_max_elevation
+import time
 
 parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
 parser.add_argument('--save-path', metavar='path',
@@ -54,14 +55,16 @@ def main():
 
     # Player measurements matrix
     m_player = np.genfromtxt(PATH_PLAYER + '/pm.csv', delimiter=',', skip_header=True)
-    m_intentions = np.genfromtxt(PATH_INTENTIONS + '/data.csv', delimiter =',', names=True)
-    m_traffic = np.genfromtxt(PATH_TRAFFIC + '/data.csv', delimiter=',', names=True)
+    m_intentions = np.genfromtxt(PATH_INTENTIONS + '/intentions.csv', delimiter =',', names=True)
+    m_traffic = np.genfromtxt(PATH_TRAFFIC + '/traffic.csv', delimiter=',', names=True)
     n_frames = np.size(m_player,0)
+    print('Found a total of %i frames' %n_frames)
     #m_traffic_csvreader = csv.reader()
 
     # for each frame in recorded data
     for frame in range(0,n_frames):
-        print('Processing frame %i' % frame)
+        start = time.time()
+
         data_input = get_input(m_player, m_intentions, m_traffic, frame, n_frames, N_STEPS_PAST)
         data_output = get_output(m_player, frame, n_frames, N_STEPS_FUTURE)
 
@@ -77,7 +80,7 @@ def main():
 
         # TODO If we want, we can plot data input as an overlay on the topviews here
 
-        filename = PATH_POINT_CLOUDS + '/pc_%i.csv' % (frame + 1)
+        filename = PATH_POINT_CLOUDS + '/pc_%i.csv' %frame
         point_cloud = point_cloud = np.loadtxt(filename, delimiter=',')
 
         # Save maximum elevation
@@ -91,6 +94,12 @@ def main():
         #filename = (PATH_INPUT + '/topviews/count/c_%i.csv') %frame
         #np.savetxt(filename, data_count, delimiter=DELIMITER, \
         #    comments=COMMENTS, fmt=PRECISION)
+
+        stop = time.time()
+        time_left = (stop - start) * (n_frames-frame)
+        m, s = divmod(time_left, 60)
+        h, m = divmod(m, 60)
+        print("Frame %i - ETA %02d:%02d:%02d" % (frame, h, m, s))
 
 def get_input(measurements, intentions, traffic, frame, n_frames, n_steps):
     all_inputs = np.zeros([n_steps, 11])

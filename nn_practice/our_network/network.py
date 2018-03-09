@@ -35,42 +35,45 @@ class Network(nn.Module):
 
         #decoder #all followed by elu
         #concatenate new values here
-        self.Linear1 = nn.Linear(360000,5000)
+        self.Linear1 = nn.Linear(360330,5000) # add more data here
         self.Linear2 = nn.Linear(5000,1000)
-        #self.Linear3 = nn.Lienar(1000, 40)
+        self.Linear3 = nn.Lienar(1000, 60)
 
 
-    def forward(self, x):# 600 x 600 x 8
+    def forward(self, l, v):# 600 x 600 x 8
         # encoder
-        x = F.elu(self.conv1(x)) # 600 x 600 x 8
-        x = F.elu(self.conv1(x)) # 600 x 600 x 8
-        x = self.maxpool1(x) # 300 x 300 x 8
-        x = F.elu(self.conv2(x)) # 300 x 300 x 16
-        x = F.elu(self.conv3(x)) # 300 x 300 x 16
-        x = F.elu(self.conv3(x)) # 300 x 300 x 16
-        x = self.maxpool2(x) # 150 x 150 x 16
+        l = F.elu(self.conv1(l)) # 600 x 600 x 8
+        l = F.elu(self.conv1(x)) # 600 x 600 x 8
+        l = self.maxpool1(l) # 300 x 300 x 8
+        l = F.elu(self.conv2(l)) # 300 x 300 x 16
+        l = F.elu(self.conv3(l)) # 300 x 300 x 16
+        l = F.elu(self.conv3(l)) # 300 x 300 x 16
+        l = self.maxpool2(l) # 150 x 150 x 16
 
         #context modules
-        x = self.spatial_dropout(F.elu(self.Layer1(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer2(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer3(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer4(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer5(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer6(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer7(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer8(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer9(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer10(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer11(x))) # 150 x 150 x 96
-        x = self.spatial_dropout(F.elu(self.Layer12(x))) # 150 x 150 x 96
-        x = F.elu(self.Layer13(x)) # 150 x 150 x 16
+        l = self.spatial_dropout(F.elu(self.Layer1(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer2(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer3(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer4(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer5(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer6(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer7(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer8(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer9(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer10(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer11(l))) # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.Layer12(l))) # 150 x 150 l 96
+        l = F.elu(self.Layer13(x)) # 150 x 150 x 16
 
         # decoder
-        x = x.view(-1, 150*150*16) # 360000
+        l = l.view(-1, 150*150*16) # 360000
         #TODO concatenate new stuff onto x. new stuff is 30*11
         # use torch.cat #360330
+        v = v.view(-1, 30*11)
+        x = torch.cat((l,v),0) # 360330
+        print(numpy.shape(x))
         x = F.elu(self.Linear1(x)) # 5000
         x = self.Linear2(x) # 1000
-        #x = (self.Linear3(x)) # 40
+        x = (self.Linear3(x)) # 60
 
         return x
