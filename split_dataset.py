@@ -4,10 +4,10 @@ import argparse
 import shutil
 
 parser = argparse.ArgumentParser(description='Split data set in training, testing, and validation set')
-parser.add_argument('--train', metavar='ratio of dataset',
+parser.add_argument('--train', metavar='ratio of dataset', type=float,
                     dest='ratio_train', default=0.7,
                     help='Ratio of original data set to put in training set')
-parser.add_argument('--test', metavar='ratio of dataset',
+parser.add_argument('--test', metavar='ratio of dataset',type=float,
                     dest='ratio_test', default=0.2,
                     help='Ratio of original data set to put in training set')
 parser.add_argument('--save-path', metavar='path',
