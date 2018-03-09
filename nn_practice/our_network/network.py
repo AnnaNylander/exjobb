@@ -34,6 +34,7 @@ class Network(nn.Module):
         self.Layer13 = nn.Conv2d(96,16,3, padding=1, dilation=1)
 
         #decoder #all followed by elu
+        #concatenate new values here
         self.Linear1 = nn.Linear(360000,5000)
         self.Linear2 = nn.Linear(5000,1000)
         #self.Linear3 = nn.Lienar(1000, 40)
@@ -66,6 +67,8 @@ class Network(nn.Module):
 
         # decoder
         x = x.view(-1, 150*150*16) # 360000
+        #TODO concatenate new stuff onto x. new stuff is 30*11
+        # use torch.cat #360330
         x = F.elu(self.Linear1(x)) # 5000
         x = self.Linear2(x) # 1000
         #x = (self.Linear3(x)) # 40

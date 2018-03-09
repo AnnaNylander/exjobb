@@ -4,26 +4,23 @@ from torch.utils.data import Dataset, DataLoader
 from torch.autograd import Variable
 import torch
 
-class CifarDataSet(Dataset):
+class OurDataset(Dataset):
 
     def __init__(self, dic, transform=None):
-        D_in = 32*32
-        D_out = 10
-        images = dic.get(b'data')
-        self.images =  numpy.reshape(images, (-1, 3, 32, 32))
 
-        labels = dic.get(b'labels')
-        one_hots = numpy.zeros([len(labels),D_out])
-        for n in range(len(labels)):
-            one_hots[n][labels[n]] = 1
-        self.labels = one_hots
+        lidars = dic.get('lidar')
+        self.lidars =  lidars
 
-        # filenames not used.
+        values = dic.get('values')
+        self.values = values
+
+        outputs = dic.get('output')
+        self.outputs = outputs
 
         self.transform = transform
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.outputs)
 
     def __getitem__(self, idx):
-        return {'image': self.images[idx], 'label': self.labels[idx]}
+        return {'lidar': self.lidars[idx], 'values': self.values[idx], 'outputs': self.outputs[idx]}

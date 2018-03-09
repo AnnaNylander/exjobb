@@ -9,8 +9,8 @@ import shutil
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
-from data_to_dict import getTestSet,getTrainingSet,getTrainingBatch
-from dataset import CifarDataSet
+from data_to_dict import getData
+from dataset import OurDataset
 from network import First_Network, Network
 from result_meter import ResultMeter
 
@@ -27,7 +27,8 @@ parser.add_argument('-e', '--epochs', default=10, type=int,
                     metavar='N', help='number of total epochs (default: 10)')
 parser.add_argument('--print-freq', '-p', default=100, type=int,
                     metavar='N', help='print frequency (default: 100)')
-
+parser.add_argument('--dataset', dest='dataset_path', default='./dataset/',
+                    type=str, metavar='PATH', help = 'path to dataset folder.')
 
 # TODO variate learning_rate depending on epoch.
 # TODO save checkpoints
@@ -39,7 +40,6 @@ def main():
     global args
     args = parser.parse_args()
     best_res = 10000 #big number
-    D_in, D_out = 32*32, 10
     learning_rate = 1e-4
     epoch_start = 0
 
@@ -76,17 +76,20 @@ def main():
 
     # Load datasets
     print("-----Loading datasets-----")
-    train_dataset = CifarDataSet(getTrainingSet())
-    test_dataset = CifarDataSet(getTestSet())
+    train_dataset = OurDataset(getData(args.dataset_path + 'train'))
+    validate_dataset = OurDataset(getData(args.dataset_path + 'validate'))
+    test_dataset = OurDataset(getData(args.dataset_path + 'test'))
 
-    dataloader = DataLoader(train_dataset, batch_size=args.batch_size,
+    dataloader_train= DataLoader(train_dataset, batch_size=args.batch_size,
                     shuffle=True, num_workers=4)
-    dataloader_val = DataLoader(test_dataset, batch_size=args.batch_size,
+    dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
+                    shuffle=False, num_workers=4)
+    dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=4)
 
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        validate(model, dataloader_val, loss_fn)
+        validate(model, dataloader_test, loss_fn)
         return
 
     #train network
@@ -97,7 +100,7 @@ def main():
     for epoch in range(epoch_start,args.epochs):
 
         # train for one epoch
-        train(model,dataloader,loss_fn, optimizer, epoch)
+        train(model,dataloader_train,loss_fn, optimizer, epoch)
 
         # evaluate on validation set
         res = validate(model, dataloader_val, loss_fn)
@@ -113,6 +116,10 @@ def main():
             'best_res': best_res,
             'optimizer' : optimizer.state_dict(),
         }, is_best, is_all_time_best)
+
+    #final evaluation on test dataset
+    print("_____EVALUATE MODEL______")
+    validate(model, dataloader_test, loss_fn)
 
 
 def train(model, dataloader, loss_fn, optimizer, epoch):
