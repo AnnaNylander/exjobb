@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 from lidar_to_topview.main import lidar_to_topview, get_max_elevation
 
-parser = argparse.ArgumentParser(description='Plot positions relative to car')
+parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
 parser.add_argument('--save-path', metavar='path',
                     dest='SAVE_PATH', default='dataset',
                     help='Where to save the dataset')

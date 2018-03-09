@@ -14,6 +14,7 @@ import argparse
 import logging
 import random
 import time
+import os
 
 from carla.client import make_carla_client
 from carla.sensor import Camera
@@ -223,7 +224,8 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
 
         # Save measurements of whole episode to one file
         saver.save_player_measurements(player_values, SAVE_PATH_PLAYER)
-        saver.save_dynamic_measurements(dynamic_values, SAVE_PATH_DYNAMIC)
+        saver.save_dynamic_measurements(header_dynamic, dynamic_values, \
+            SAVE_PATH_DYNAMIC)
 
         episode_end = datetime.datetime.now()
         episode_time = episode_end - episode_start

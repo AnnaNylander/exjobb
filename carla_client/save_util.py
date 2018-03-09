@@ -132,6 +132,7 @@ def get_dynamic_measurements_header(measurements):
             header.append(str(agent_id))
         else:
             continue
+
     return DELIMITER.join(header)
 
 def get_agent_type(agent):
@@ -201,12 +202,12 @@ def save_static_measurements(static_objects, save_path):
     np.savetxt(save_path + "/sm.csv", objects, fmt=MEASUREMENTS_PRECISION, \
         header=header, comments=COMMENTS, delimiter=DELIMITER)
 
-def save_dynamic_measurements(dynamic_values, save_path):
+def save_dynamic_measurements(header, dynamic_values, save_path):
     n_objects = len(dynamic_values)
     keys = list(dynamic_values.keys())
     n_frames = len(dynamic_values[keys[0]])
     objects = np.zeros([n_frames,n_objects])
-    header = ''
+
     for i, key in enumerate(dynamic_values):
         header += str(key) + ' '
         value = dynamic_values[key] # This is a list of states
