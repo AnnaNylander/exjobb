@@ -3,6 +3,9 @@ intentions/google_api_key.txt
 intentions/*.csv
 depth_to_lidar/matlab/*.mat
 depth_to_lidar/matlab/*.m~
+nn_practice/*/data/raw/*
+nn_practice/*/data/*.csv
+nn_practice/cifar10/data/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
