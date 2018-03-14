@@ -23,3 +23,25 @@ class ResultMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+    def serialize(self):
+        dic = {}
+        dic['values'] = self.values
+        dic['epoch'] = self.epoch
+        dic['batch'] = self.batch
+        dic['step'] = self.step
+        dic['val'] = self.val
+        dic['avg'] = self.avg
+        dic['sum'] = self.sum
+        dic['count'] = self.count
+        return dic
+
+    def deserialize(self, dic):
+        self.values = dic['values']
+        self.epoch = dic['epoch']
+        self.batch = dic['batch']
+        self.step = dic['step']
+        self.val = dic['val']
+        self.avg = dic['avg']
+        self.sum = dic['sum']
+        self.count = dic['count']

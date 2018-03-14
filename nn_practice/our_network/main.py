@@ -27,8 +27,8 @@ parser.add_argument('-e', '--epochs', default=10, type=int,
                     metavar='N', help='number of total epochs (default: 10)')
 parser.add_argument('--print-freq', '-p', default=100, type=int,
                     metavar='N', help='print frequency (default: 100)')
-parser.add_argument('--save-freq', '-pl', default=100, type=int,
-                    metavar='N', dest='save_freq', help='save frequency (default: 100 batch)')
+parser.add_argument('--plot-freq', '-pl', default=100, type=int,
+                    metavar='N', dest='plot_freq', help='plot frequency (default: 100 batch)')
 parser.add_argument('--dataset', dest='dataset_path', default='./dataset/',
                     type=str, metavar='PATH', help = 'path to dataset folder.')
 parser.add_argument('--save-path', dest='save_path', default='./saved/',
@@ -43,9 +43,9 @@ args = parser.parse_args()
 def main():
     # variables
     best_res = 10000 #big number
-    learning_rate = 1e-3 #1e-4
-    epoch_start = 1
-    step_start = 1
+    learning_rate = 1e-4 #1e-4
+    epoch_start = 0
+    step_start = 0
     train_losses = ResultMeter()
     validation_losses = ResultMeter()
     times = ResultMeter()
@@ -68,7 +68,8 @@ def main():
     # define loss function and optimizer
     print("-----Creating lossfunction and optimizer-----")
     loss_fn = torch.nn.MSELoss().cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
 
     #resume from checkpoint
     if args.resume:
@@ -82,17 +83,19 @@ def main():
         model.load_state_dict(checkpoint['state_dict'])
         best_res = checkpoint['best_res']
         optimizer.load_state_dict(checkpoint['optimizer'])
-        train_losses = checkpoint['train_losses']
-        validation_losses = checkpoint['validation_losses']
-        times = checkpoint['times']
+        train_losses.deserialize(checkpoint['train_losses'])
+        validation_losses.deserialize(checkpoint['validation_losses'])
+        times.deserialize(checkpoint['times'])
 
+        del checkpoint
         print("Loaded checkpoint sucessfully")
 
     # Load datasets
     print("-----Loading datasets-----")
-    train_dataset = OurDataset(getData(args.dataset_path + 'train/',50)) # 2100
-    validate_dataset = OurDataset(getData(args.dataset_path + 'validate/',10)) # 600
-    test_dataset = OurDataset(getData(args.dataset_path + 'test/',10)) # 300
+    # TODO if evaluate flag is true, don't load all the datasets.
+    train_dataset = OurDataset(getData(args.dataset_path + 'train/', 2100)) # 2100
+    validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 600)) # 600
+    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 300)) # 300
 
     dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
                     shuffle=True, num_workers=4, pin_memory=True)
@@ -101,79 +104,82 @@ def main():
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=4, pin_memory=True)
 
-    if args.evaluate:
-        print("_____EVALUATE MODEL______")
-        validate(model, dataloader_test, loss_fn,True)
-        return
-
     # Train network
-    print("______TRAIN MODEL_______")
-    main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
-                validation_losses, times, dataloader_train, dataloader_val,
-                best_res, all_time_best_res)
+    if not args.evaluate:
+        print("______TRAIN MODEL_______")
+        main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
+                    validation_losses, times, dataloader_train, dataloader_val,
+                    best_res, all_time_best_res)
 
     # Final evaluation on test dataset
     print("_____EVALUATE MODEL______")
-    test_loss = validate(model, dataloader_test, loss_fn)
+    test_loss = validate(model, dataloader_test, loss_fn, True)
     print("Test loss: %f" %test_loss)
 
 def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                 validation_losses, times, dataloader_train, dataloader_val,
                 best_res, all_time_best_res):
 
-    print("Train network for a total of {diff} epochs "
-            "(first is {epochs}, last is {total_epochs})".format(
-            diff = max((args.epochs+1)-epoch_start,0),
+    print("train network for a total of {diff} epochs."\
+            " [{epochs}/{total_epochs}]".format( \
+            diff = max(args.epochs-epoch_start,0),
             epochs = epoch_start, total_epochs = args.epochs))
 
     step = step_start
-    for epoch in range(epoch_start, args.epochs + 1):
-
+    for epoch in range(epoch_start, args.epochs):
         # Train for one epoch
         for i, batch in enumerate(dataloader_train):
-            i += 1 # just to start off att batch 1 and not batch 0
             start_time = time.time()
 
             # Train model with current batch and save loss and duration
             train_loss = train(model, batch, loss_fn, optimizer)
-            train_losses.update(epoch, i, step, train_loss)
-            times.update(epoch, i, step, time.time() - start_time)
+            train_losses.update(epoch + 1, i + 1, step, train_loss)
+            times.update(epoch + 1, i + 1, step, time.time() - start_time)
 
             # Print statistics
             if step % args.print_freq == 0:
                 print_statistics(train_losses, times, len(dataloader_train))
 
             # Evaluate on validation set and save checkpoint
-            if step % args.save_freq == 0:
+            if step % args.plot_freq == 0:
 
                 validation_loss = validate(model, dataloader_val, loss_fn)
-                validation_losses.update(epoch, i, step, validation_loss)
-
-                # Store best loss value
-                is_best = validation_loss < best_res
-                best_res = min(validation_loss, best_res)
-                is_all_time_best = validation_loss < all_time_best_res
-                all_time_best_res = min(validation_loss, all_time_best_res)
-
-                # Save checkpoint
-                save_checkpoint({
-                    'epoch': epoch,
-                    'step' : step,
-                    'state_dict': model.state_dict(),
-                    'best_res': best_res,
-                    'optimizer' : optimizer.state_dict(),
-                    'train_losses' : train_losses.values,
-                    'validation_losses' : validation_losses.values,
-                    'times' : times.values
-                }, is_best, is_all_time_best)
-
-                print('Validation loss: %.3f' %validation_loss)
+                validation_losses.update(epoch + 1, i + 1, step, validation_loss)
 
                 # Save losses to csv for plotting
                 save_statistic(train_losses, args.save_path + 'train_losses.csv')
                 save_statistic(validation_losses, args.save_path + 'validation_losses.csv')
 
             step += 1
+            #end of dataloader loop
+
+        #print epoch results
+        print_statistics(train_losses, times, len(dataloader_train))
+
+        validation_loss = validate(model, dataloader_val, loss_fn)
+        validation_losses.update(epoch + 1, i + 1, step, validation_loss)
+
+        # Store best loss value
+        is_best = validation_loss < best_res
+        best_res = min(validation_loss, best_res)
+        is_all_time_best = validation_loss < all_time_best_res
+        all_time_best_res = min(validation_loss, all_time_best_res)
+
+        # Save checkpoint
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'step' : step + 1,
+            'state_dict': model.state_dict(),
+            'best_res': best_res,
+            'optimizer' : optimizer.state_dict(),
+            'train_losses' : train_losses.serialize(),
+            'validation_losses' : validation_losses.serialize(),
+            'times' : times.serialize()
+        }, is_best, is_all_time_best)
+
+        print('Validation complete. Final results: \n'
+                'Loss {losses.val:.4f} ({losses.avg:.4f})'\
+                .format(losses=validation_losses))
 
 def print_statistics(losses, times, batch_length):
     print('Epoch: [{0}][{1}/{2}]\t'
@@ -189,7 +195,7 @@ def train(model, batch, loss_fn, optimizer):
     targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
 
     lidars = lidars.view(-1, 1, 600, 600)
-    values = values.view(-1, 1, 30, 11)
+    values = values.view(-1, 30, 11)
     targets = targets.view(-1, 60)
 
     output = model(lidars, values)
@@ -201,7 +207,7 @@ def train(model, batch, loss_fn, optimizer):
 
     return loss.data[0] # return loss for this batch
 
-def validate(model, dataloader, loss_fn):
+def validate(model, dataloader, loss_fn, save_output=False):
     model.eval() # switch to eval mode
 
     losses = ResultMeter()
@@ -211,21 +217,38 @@ def validate(model, dataloader, loss_fn):
         lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor),volatile=True)
         values = Variable((batch['value']).type(torch.cuda.FloatTensor),volatile=True)
         targets = Variable((batch['output']).type(torch.cuda.FloatTensor),volatile=True)
+        indices = batch['indices']
 
         # Set correct shape on input and output
         lidars = lidars.view(-1, 1, 600, 600)
-        values = values.view(-1, 1, 30, 11)
+        values = values.view(-1, 30, 11)
         targets = targets.view(-1, 60)
 
         # Run model and calculate loss
         output = model(lidars, values)
         loss = loss_fn(output, targets)
 
+        # Save generated predictions to file
+        if save_output:
+            current_batch_size = numpy.size(output,0)
+            outputs = numpy.split(output.data, current_batch_size, 0)
+            path = args.save_path + 'generated_output/'
+            generate_output(indices, outputs, i, path)
+
         # Document results
         losses.update(0, 0, i, loss.data[0])
 
     return losses.avg
 
+def generate_output(indices, outputs, batch_index, path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    for i, output in enumerate(outputs):
+        output = output.view(-1,2)
+        filename = path + 'gen_%i.csv' %(indices[i])
+        numpy.savetxt(filename, output, comments='', delimiter=',',fmt='%.8f',
+                        header='x,y')
 
 def save_checkpoint(state, is_best, is_all_time_best,
         filename = args.save_path + 'checkpoint.pt'):
@@ -251,12 +274,11 @@ def accuracy(output, target):
     """ Not implemented yet. Unsure exactly what we want."""
 
 def get_n_params(model):
-    pp=0
+    pp = 0
     for p in list(model.parameters()):
-        #print(p.size())
-        nn=1
+        nn = 1
         for s in list(p.size()):
-            nn = nn*s
+            nn = nn * s
         pp += nn
     return pp
 
@@ -264,10 +286,6 @@ def save_statistic(result_meter, path):
     #TODO check that path parent directory exists
     values = numpy.array(result_meter.values)
     numpy.savetxt(path, values, comments='', delimiter=',',fmt='%.6f')
-    #fd = open(path,'a')
-    #row = [str(step),str(statistic)]
-    #fd.write(','.join(row) + '\n')
-    #fd.close()
 
 if __name__ == '__main__':
     main()

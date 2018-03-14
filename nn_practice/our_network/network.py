@@ -38,11 +38,11 @@ class Network(nn.Module):
         #decoder #all followed by elu
         #concatenate new values here
         self.Linear1 = nn.Linear(360330,1000) # add more data here
-        #self.Linear2 = nn.Linear(5000,1000)
-        self.Linear3 = nn.Linear(1000, 60)
+        self.Linear2 = nn.Linear(1000,500)
+        self.Linear3 = nn.Linear(500, 500)
+        self.Linear4 = nn.Linear(500, 60)
 
     def forward(self, l, v): # 600 x 600 x 1
-#        print(l)
         # encoder
         l = F.elu(self.conv0(l)) # 600 x 600 x 8
         l = F.elu(self.conv1(l)) # 600 x 600 x 8
@@ -51,7 +51,6 @@ class Network(nn.Module):
         l = F.elu(self.conv3(l)) # 300 x 300 x 16
         l = F.elu(self.conv3(l)) # 300 x 300 x 16
         l = self.maxpool2(l) # 150 x 150 x 16
-        #print('Håll noga koll härifrån vad som händer')
         #context module
         l = self.spatial_dropout(F.elu(self.Layer1(l))) # 150 x 150 x 96
         l = self.spatial_dropout(F.elu(self.Layer2(l))) # 150 x 150 x 96
@@ -66,28 +65,14 @@ class Network(nn.Module):
         l = self.spatial_dropout(F.elu(self.Layer11(l))) # 150 x 150 x 96
         l = self.spatial_dropout(F.elu(self.Layer12(l))) # 150 x 150 x 96
         l = F.elu(self.Layer13(l)) # 150 x 150 x 16
-#        print('efter context modulen')
-#        print(l)
+
         # decoder
         l = l.view(-1, 150*150*16) # 360000
-        #TODO concatenate new stuff onto x. new stuff is 30*11
-        # use torch.cat #360330
         v = v.view(-1, 30*11)
-#        print(numpy.shape(v))
-#        print(numpy.shape(l))
-#        print('v and l in that order')
-#        print(v)
-#        print(l)
         x = torch.cat((l,v),1) # 360330
-#        print(x)
-#        print('and now for linear1')
-        x = (self.Linear1(x)) # 5000
-#        print(x)
-#        print(numpy.shape(x))
-        #x =F.elu( self.Linear2(x)) # 1000
-#        print(numpy.shape(x))
-        x = (self.Linear3(x)) # 60
-#        print('return')
-#        print(numpy.shape(x))
+        x = F.elu(self.Linear1(x)) # 5000
+        x = F.elu(self.Linear2(x)) # 1000
+        x = F.elu(self.Linear3(x)) # 500
+        x = self.Linear4(x)
 
         return x

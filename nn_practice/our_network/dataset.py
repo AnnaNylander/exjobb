@@ -8,6 +8,9 @@ class OurDataset(Dataset):
 
     def __init__(self, dic, transform=None):
 
+        indices = dic.get('indices')
+        self.indices = indices
+
         lidars = dic.get('lidar')
         self.lidars =  lidars
 
@@ -17,10 +20,12 @@ class OurDataset(Dataset):
         outputs = dic.get('output')
         self.outputs = outputs
 
+
         self.transform = transform
 
     def __len__(self):
-        return len(self.outputs)
+        return len(self.indices)
 
     def __getitem__(self, idx):
-        return {'lidar': self.lidars[idx], 'value': self.values[idx], 'output': self.outputs[idx]}
+        return {'indices': self.indices[idx], 'lidar': self.lidars[idx], \
+                'value': self.values[idx], 'output': self.outputs[idx]}
