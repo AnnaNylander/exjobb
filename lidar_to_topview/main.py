@@ -7,7 +7,7 @@ ELEVATION_MIN = -18
 #point_cloud = np.loadtxt('data/hej.csv', delimiter=' ')
 #point_cloud = trim_to_roi(point_cloud,ROI)
 
-def lidar_to_topview(frame, point_cloud, ROI, CELLS):
+def lidar_to_topview(point_cloud, ROI, CELLS):
     grid = np.zeros([CELLS,CELLS,1])
 
     for point in point_cloud:
@@ -24,7 +24,6 @@ def lidar_to_topview(frame, point_cloud, ROI, CELLS):
 
     grid = np.rot90(grid,2)
     return np.uint8(100*grid)
-
 
 def get_max_elevation(frame, point_cloud, ROI, CELLS):
     grid = np.full([CELLS,CELLS,1], np.nan)

@@ -16,10 +16,9 @@ If you instead want to run the source server (must already be manually compiled)
 
 # How to create data set
 1. First we need to create the intentions and traffic awareness csv files.
-1. Go to `/path_to_exjobb_repo/intentions/carla/`
-1. Run `python3 main.py --path path/to/recorded_data/`
-1. Now all needed files are generated so we can create the actual dataset. Go to `/path_to_exjobb_repo/`
-1. Run `python3 make_dataset.py --future=30 --past=30 --save-path="/where/to/save/dataset"` to create a dataset which takes into account 30 future and past timesteps.
+1. Go to `/path_to_exjobb_repo/`
+1. Run `python3 make_dataset.py` (with arguments) to create a dataset.
+1. Then run `python3 split_dataset.py` (with arguments) to split the dataset into train, validation and test sets.
 
 # How to visualize a frame
 1. Run `python3 visualize.py --step n` where n is the frame number to visualize.

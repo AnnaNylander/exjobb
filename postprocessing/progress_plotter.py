@@ -1,7 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 
-AVG = 20
+parser = argparse.ArgumentParser(description='Plot positions relative to car')
+parser.add_argument('--path', metavar='PATH', type=str,
+                    dest='path', default='/saved/',
+                    help='Path to folder with saved losses')
+parser.add_argument('--avg', metavar='N', type=int,
+                    dest='avg', default=20,
+                    help='Moving average windows size')
+
+args = parser.parse_args()
 
 def moving_average(a, n=100) :
     ret = np.cumsum(a, dtype=float)
@@ -9,13 +18,13 @@ def moving_average(a, n=100) :
     return ret[n - 1:] / n
 
 def main():
-    PATH_TRAIN = '/home/annaochjacob/Repos/exjobb/nn_practice/our_network/saved/train_losses.csv'
-    PATH_VALIDATE = '/home/annaochjacob/Repos/exjobb/nn_practice/our_network/saved/validation_losses.csv'
+    PATH_TRAIN = args.path + 'train_losses.csv'
+    PATH_VALIDATE = args.path + 'validation_losses.csv'
     train = np.loadtxt(PATH_TRAIN, delimiter=',')
     validate = np.loadtxt(PATH_VALIDATE, delimiter=',')
 
-    #train_values = moving_average(train[:,1], AVG)
-    #validate_values = moving_average(validate[:,1], AVG)
+    #train_values = moving_average(train[:,1], args.avg)
+    #validate_values = moving_average(validate[:,1], args.avg)
 
     train_values = train[:,1]
     validate_values = validate[:,1]
@@ -28,7 +37,7 @@ def main():
 
     axes = plt.gca()
     axes.set_xlim([0,np.max(train[:,0])])
-    axes.set_ylim([0,10])
+    axes.set_ylim([0,5])
 
     plt.show()
 

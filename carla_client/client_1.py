@@ -65,16 +65,16 @@ argparser.add_argument(
 argparser.add_argument(
     '--save-path',
     metavar='PATH',
-    default='/recorded_data',
+    default='recorded_data/',
     dest='save_path',
     help='Number of frames to run the client')
 
 args = argparser.parse_args()
 
-SAVE_PATH_PLAYER = args.save_path + '/player_measurements'
-SAVE_PATH_STATIC = args.save_path + '/static_measurements'
-SAVE_PATH_DYNAMIC = args.save_path + '/dynamic_measurements'
-SAVE_PATH_POINT_CLOUD = args.save_path + '/point_cloud'
+SAVE_PATH_PLAYER = args.save_path + 'player_measurements/'
+SAVE_PATH_STATIC = args.save_path + 'static_measurements/'
+SAVE_PATH_DYNAMIC = args.save_path + 'dynamic_measurements/'
+SAVE_PATH_POINT_CLOUD = args.save_path + 'point_cloud/'
 MOVING_AVERAGE_LENGTH = 10
 
 

@@ -4,16 +4,16 @@ import argparse
 import math
 import numpy
 
-parser = argparse.ArgumentParser(description='Create json file')
-parser.add_argument('--path', metavar='PATH', dest='path',
-                    help='path to recorded_data.')
+#parser = argparse.ArgumentParser(description='Create json file')
+#parser.add_argument('--path', metavar='PATH', dest='path',
+#                    help='path to recorded_data.')
 
-args = parser.parse_args()
+#args = parser.parse_args()
 
 def create_json(args):
-    CSVFILE_PATH = args.path + 'player_measurements/pm.csv'
-    ANNOTATIONS_PATH = args.path + 'intentions/manual_annotations.csv'
-    JSON_PATH = args.path + 'intentions/intentions.json'
+    CSVFILE_PATH = args.data_path + 'player_measurements/pm.csv'
+    ANNOTATIONS_PATH = args.data_path + 'intentions/manual_annotations.csv'
+    JSON_PATH = args.data_path + 'intentions/intentions.json'
 
     csv_data = numpy.genfromtxt(CSVFILE_PATH, delimiter=',', names=True)
     annoreader = csv.DictReader(open(ANNOTATIONS_PATH), delimiter=' ')

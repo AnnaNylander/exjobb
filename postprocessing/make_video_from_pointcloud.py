@@ -2,17 +2,27 @@ import cv2
 import os
 import numpy as np
 from PIL import Image
+import argparse
 
-image_folder = 'point_cloud/'
+parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
+parser.add_argument('--path', metavar='path', dest='path',
+                    default='/media/annaochjacob/crucial/recorded_data/carla/recorded_data_2018-03-07/point_cloud/',
+                    help='Path to folder where point clouds is stored.')
+
+args = parser.parse_args()
+
+
+image_folder = args.path
+
 CELLS = 600
 ROI = 60
 
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
 video = cv2.VideoWriter('video.avi', fourcc, 10.0, (600,600), False)
 
-for i in range(1,10000):
+for i in range(1,100):
     print(i)
-    point_cloud = np.genfromtxt(image_folder + 'pc_%i.csv'%i, delimiter=' ')
+    point_cloud = np.genfromtxt(image_folder + 'pc_%i.csv'%i, delimiter=',')
 
     grid = np.zeros([CELLS,CELLS])
     for point in point_cloud:

@@ -43,7 +43,7 @@ args = parser.parse_args()
 def main():
     # variables
     best_res = 10000 #big number
-    learning_rate = 1e-4 #1e-4
+    learning_rate = 1e-6 #1e-4
     epoch_start = 0
     step_start = 0
     train_losses = ResultMeter()
@@ -93,14 +93,14 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     # TODO if evaluate flag is true, don't load all the datasets.
-    train_dataset = OurDataset(getData(args.dataset_path + 'train/', 2100)) # 2100
-    validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 600)) # 600
-    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 300)) # 300
+    #validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 300))
+    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 600))
+    #train_dataset = OurDataset(getData(args.dataset_path + 'train/', 2100))
 
-    dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
-                    shuffle=True, num_workers=4, pin_memory=True)
-    dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
-                    shuffle=False, num_workers=4, pin_memory=True)
+    #dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
+    #                shuffle=True, num_workers=4, pin_memory=True)
+    #dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
+    #                shuffle=False, num_workers=4, pin_memory=True)
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=4, pin_memory=True)
 

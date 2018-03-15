@@ -7,6 +7,8 @@ def getData(path,max):
     path_topviews = path + 'input/topviews/max_elevation/'
     path_values = path + 'input/values/'
     path_output = path + 'output/'
+    if max > len(os.listdir(path_topviews)):
+        max = len(os.listdir(path_topviews))
 
     dic = {}
     print('\tINDICES')

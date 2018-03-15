@@ -3,27 +3,29 @@ import json
 import argparse
 import math
 import numpy
-from intentions import getData, getDataTraffic
-from create_json_intentions import create_json as intentions_json
-from create_json_traffic import create_json as traffic_json
+from intentions.carla.get_intentions import getData, getDataTraffic
+from intentions.carla.create_json_intentions import create_json as intentions_json
+from intentions.carla.create_json_traffic import create_json as traffic_json
 
 
-parser = argparse.ArgumentParser(description='Calculate intentions')
-parser.add_argument('--path', metavar='PATH', dest='path',
-                    help='path to recorded_data.')
+#parser = argparse.ArgumentParser(description='Calculate intentions')
+#parser.add_argument('--path', metavar='PATH', dest='data_path',
+#                    help='path to recorded_data (with trailing / ).')
 
-args = parser.parse_args()
+#args = parser.parse_args()
 
-DYNAMIC_PATH = args.path + 'dynamic_measurements/dm.csv'
-CSVFILE_PATH = args.path + 'player_measurements/pm.csv'
-JSON_INTENTIONS = args.path + 'intentions/intentions.json'
-JSON_TRAFFIC = args.path + 'traffic_awareness/traffic.json'
-TARGET_TRAFFIC_PATH = args.path + 'traffic_awareness/traffic.csv'
-TARGET_INTENTIONS_PATH = args.path + 'intentions/intentions.csv'
-
-def main():
+def main(args):
     """ Read GPS-IMU values from csv file and calculate intentions.
     Then write the intentions to a new csv file. Also writing traffic intentions."""
+
+    # create paths.
+    DYNAMIC_PATH = args.data_path + 'dynamic_measurements/dm.csv'
+    CSVFILE_PATH = args.data_path + 'player_measurements/pm.csv'
+    JSON_INTENTIONS = args.data_path + 'intentions/intentions.json'
+    JSON_TRAFFIC = args.data_path + 'traffic_awareness/traffic.json'
+    TARGET_TRAFFIC_PATH = args.data_path + 'traffic_awareness/traffic.csv'
+    TARGET_INTENTIONS_PATH = args.data_path + 'intentions/intentions.csv'
+
 
     print("****** Creating json files ******")
     print("\t json for intentions")
@@ -70,4 +72,4 @@ def main():
 
 
 if __name__=="__main__":
-    main()
+    main(args)

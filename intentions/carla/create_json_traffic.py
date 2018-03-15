@@ -3,13 +3,13 @@ import json
 import argparse
 import math
 import numpy
-from util import getEulerDistance, isWithinRadius
+from intentions.carla.util import getEulerDistance, isWithinRadius
 
-parser = argparse.ArgumentParser(description='Create json file')
-parser.add_argument('--path', metavar='PATH', dest='path',
-                    help='path to recorded_data.')
+#parser = argparse.ArgumentParser(description='Create json file')
+#parser.add_argument('--path', metavar='PATH', dest='path',
+#                    help='path to recorded_data.')
 
-args = parser.parse_args()
+#args = parser.parse_args()
 
 RADIUS = 4
 
@@ -29,10 +29,10 @@ def isVisible(a, b):
 
 
 def create_json(args):
-    DYNAMIC_PATH = args.path + 'dynamic_measurements/dm.csv'
-    STATIC_PATH = args.path + 'static_measurements/sm.csv'
-    CSVFILE_PATH = args.path + 'player_measurements/pm.csv'
-    JSON_PATH = args.path + 'traffic_awareness/traffic.json'
+    DYNAMIC_PATH = args.data_path + 'dynamic_measurements/dm.csv'
+    STATIC_PATH = args.data_path + 'static_measurements/sm.csv'
+    CSVFILE_PATH = args.data_path + 'player_measurements/pm.csv'
+    JSON_PATH = args.data_path + 'traffic_awareness/traffic.json'
 
     print("Reading car information from " + CSVFILE_PATH +\
             "\nReading static information from " + STATIC_PATH +\

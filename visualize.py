@@ -1,74 +1,129 @@
 import numpy as np
 import matplotlib
+import os
+import re
 import matplotlib.pyplot as plt
 import argparse
 from lidar_to_topview.main import lidar_to_topview, get_max_elevation
 
-ROI = 60
-CELLS = 600
-SIDE = 40
-DATA_PATH = '/Users/Jacob/Documents/Datasets/exjobb/recorded_data_2018-03-02/data_set'
-PATH_POINT_CLOUD = '/Users/Jacob/Documents/Datasets/exjobb/recorded_data_2018-03-02/point_cloud'
-SUBPLOT_ROWS = 2
-SUBPLOT_COLS = 2
+parser = argparse.ArgumentParser(description='TODO Description hehe')
+parser.add_argument('--step', metavar='N', type=int,
+                    dest='timeStep', default=None,
+                    help='Time step (frame index) to plot. (default all)')
+parser.add_argument('--prediction', dest='prediction', action='store_true',
+                    help='Whether to plot predictions or not')
+parser.add_argument('--everything', dest='everything', action='store_true',
+                    help='Whether to plot all graphs or not.')
 
-parser = argparse.ArgumentParser(description='Plot positions relative to car')
-parser.add_argument('--step', metavar='integer', type=int,
-                    dest='timeStep', default=0,
-                    help='Time step (frame index) to plot as current fram.')
+parser.add_argument('--save-path', metavar='path',
+                    dest='save_path',
+                    help='Where to save the images')
 
+parser.add_argument('--dataset', metavar='path',
+                    dest='dataset',
+                    help='path to dataset folder')
+parser.add_argument('--recorded_data', metavar='path',
+                    dest='recorded',
+                    help='path to recorded data folder')
+parser.add_argument('--saved_models', metavar='path',
+                    dest='saved_models',
+                    help='path to folder of saved models')
 args = parser.parse_args()
 
+ROI = 60
+CELLS = 600
+SIDE = 60
+PATH_DATA = args.dataset
+PATH_POINT_CLOUD = args.recorded + 'point_cloud/'
+PATH_PREDICTION = args.saved_models + 'generated_output/'
+SAVE_PATH = args.dataset + 'images/'
+SUBPLOT_ROWS = 1
+SUBPLOT_COLS = 1
+
 def main():
-    output_path = DATA_PATH + '/output/output_%i.csv' % args.timeStep
-    input_path = DATA_PATH + '/input/values/input_%i.csv' % args.timeStep
+    # if only one timeStep
+    if args.timeStep is not None:
+        visualize(args.timeStep, SAVE_PATH, args.prediction, args.everything)
 
-    # Read point cloud and generate top view image
-    filename = PATH_POINT_CLOUD + '/pc_%i.csv' % args.timeStep
-    point_cloud = np.genfromtxt(filename, delimiter=' ')
-    topview_img = lidar_to_topview(args.timeStep, point_cloud, ROI, CELLS)
-    topview_img = topview_img.squeeze()
-    #imgplot = plt.imshow(topview_img, cmap='gray')
-    #plt.show()
+    # else save all in folder.
+    else:
+        indices = getIndices(PATH_DATA)
+        for i in indices:
+            visualize(i, SAVE_PATH, args.prediction, args.everything)
+            print(i)
 
-    values_future = np.genfromtxt(output_path, delimiter=',', skip_header=True)
-    values_past = np.genfromtxt(input_path, delimiter=',', skip_header=True)
+def getIndices(path):
+    path = path + 'input/values/'
+    nr_of_files = len(os.listdir(path))
+    res = np.zeros([nr_of_files])
+    idx = 0
+    for filename in os.listdir(path):
+        data = int (re.search('\d+', filename).group())
+        res[idx] = data
+        idx = idx + 1
+    return res
 
-    future_loc_x = values_future[:,0]
-    future_loc_y = values_future[:,1]
-    past_loc_x = values_past[:,0]
-    past_loc_y = values_past[:,1]
-    past_fwd_acc = values_past[:,2]
-    past_fwd_speed = values_past[:,3]
-    past_steer = values_past[:,4]
-
-    # Past and future path
-    plot(future_loc_x, future_loc_y, 'b', topview_img, SUBPLOT_ROWS, \
-    SUBPLOT_COLS, 1,'Past and future path',SIDE)
-    plot(past_loc_x, past_loc_y, 'r', topview_img, SUBPLOT_ROWS, \
-        SUBPLOT_COLS, 1,'Past and future path',SIDE)
-    plot(past_loc_x, past_loc_y, past_fwd_acc, topview_img, SUBPLOT_ROWS, \
-        SUBPLOT_COLS, 2,'Forward acceleration',SIDE)
-    plot(past_loc_x, past_loc_y, past_fwd_speed, topview_img, SUBPLOT_ROWS, \
-        SUBPLOT_COLS, 3,'Forward speed',SIDE)
-    plot(past_loc_x, past_loc_y, past_steer, topview_img, SUBPLOT_ROWS, \
-        SUBPLOT_COLS, 4,'Steer',SIDE)
-
-    plt.show()
 
 def plot(x, y ,c , image ,subplot_rows, subplot_cols, subplot_index, title, side):
     plt.subplot(subplot_rows, subplot_cols, subplot_index)
     plt.imshow(image, cmap='gray', extent=[-side/2, side/2, -side/2, side/2], \
         interpolation='bilinear')
     cmap = matplotlib.cm.Greys
-    future_plot = plt.scatter(x, y, marker='.', c=c, cmap=cmap)
+    plot = plt.scatter(x, y, marker='.', c=c, cmap=cmap)
+    # TODO add legend
     fig = plt.gcf()
-    #plt.legend((future_plot, past_plot),('Future','Past'))
     axes = fig.gca()
     axes.set_xlim([-side/2, side/2])
     axes.set_ylim([-side/2, side/2])
     axes.set_aspect('equal')
     axes.set_title(title)
+
+def visualize(step, path, prediction, everything):
+    plt.gcf().clear()
+    SUBPLOT_ROWS = 1
+    SUBPLOT_COLS = 1
+    if everything:
+        SUBPLOT_ROWS = 2
+        SUBPLOT_COLS = 2
+
+    # Read point cloud and generate top view image
+    filename = PATH_POINT_CLOUD + 'pc_%i.csv' % step
+    point_cloud = np.genfromtxt(filename, delimiter=',')
+    topview_img = lidar_to_topview(point_cloud, ROI, CELLS)
+    topview_img = topview_img.squeeze()
+
+    #past
+    path_input = PATH_DATA + 'input/values/input_%i.csv' % step
+    values_past = np.genfromtxt(path_input, delimiter=',', skip_header=True)
+    past_loc_x = values_past[:,0]
+    past_loc_y = values_past[:,1]
+    plot_past = plot(past_loc_x, past_loc_y, 'r', topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 1,'Past and future path',SIDE)
+
+    #future
+    path_output = PATH_DATA + 'output/output_%i.csv' % step
+    values_future = np.genfromtxt(path_output, delimiter=',', skip_header=True)
+    future_loc_x = values_future[:,0]
+    future_loc_y = values_future[:,1]
+    plot_future = plot(future_loc_x, future_loc_y, 'g', topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 1,'Past and future path',SIDE)
+
+    #prediction
+    if prediction:
+        path_pred = PATH_PREDICTION + 'gen_%i.csv' % step
+        values_pred = np.genfromtxt(path_pred, delimiter=',', skip_header=True)
+        pred_loc_x = values_pred[:,0]
+        pred_loc_y = values_pred[:,1]
+        plot_pred = plot(pred_loc_x, pred_loc_y, 'y', topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 1,'Predicted',SIDE)
+
+    # if several subplots
+    if everything:
+        past_fwd_acc = values_past[:,2]
+        past_fwd_speed = values_past[:,3]
+        past_steer = values_past[:,4]
+        plot(past_loc_x, past_loc_y, past_fwd_acc, topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 2,'Forward acceleration',SIDE)
+        plot(past_loc_x, past_loc_y, past_fwd_speed, topview_img, SUBPLOT_ROWS,SUBPLOT_COLS, 3,'Forward speed',SIDE)
+        plot(past_loc_x, past_loc_y, past_steer, topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 4,'Steer',SIDE)
+
+    plt.savefig(path + 'img_%i.png' %step)
 
 if __name__ == "__main__":
     main()

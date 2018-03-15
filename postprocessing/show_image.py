@@ -1,10 +1,19 @@
 import numpy as np
 from PIL import Image
+import argparse
+
+parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
+parser.add_argument('--path', metavar='file.csv',
+                    dest='path', default='/media/annaochjacob/crucial/recorded_data/carla/recorded_data_2018-03-07/point_cloud/',
+                    help='Path to folder where images is stored.')
+parser.add_argument('-i', '--index', default=0, type=int,
+                    metavar='N', help='index of pointcloud.')
+args = parser.parse_args()
 
 CELLS = 600
 ROI = 60
 
-point_cloud = np.genfromtxt('pc_5555.csv', delimiter=' ')
+point_cloud = np.genfromtxt(args.path + 'pc_%i.csv' %args.index, delimiter=',')
 
 grid = np.zeros([CELLS,CELLS])
 

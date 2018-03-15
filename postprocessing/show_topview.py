@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 import argparse
 
-DATA_PATH = '/Users/Jacob/Documents/Datasets/exjobb/recorded_data_2018-03-02/data_set/input/topviews'
+DATA_PATH = '/media/annaochjacob/crucial/datasets/test_set1/input/topviews/'
 
 parser = argparse.ArgumentParser(description='Show topview')
 parser.add_argument('--step', metavar='integer', type=int,
@@ -16,9 +16,9 @@ args = parser.parse_args()
 
 filename = DATA_PATH
 if args.statistic == 0:
-    filename += '/max_elevation/me_%i.csv' %args.timeStep
+    filename += 'max_elevation/me_%i.csv' %args.timeStep
 elif args.statistic == 1:
-    filename += '/count/c_%i.csv' %args.timeStep
+    filename += 'count/c_%i.csv' %args.timeStep
 
 grid = np.genfromtxt(filename, delimiter=',')
 img = Image.fromarray(grid)
