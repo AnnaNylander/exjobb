@@ -75,6 +75,7 @@ SAVE_PATH_PLAYER = args.save_path + 'player_measurements/'
 SAVE_PATH_STATIC = args.save_path + 'static_measurements/'
 SAVE_PATH_DYNAMIC = args.save_path + 'dynamic_measurements/'
 SAVE_PATH_POINT_CLOUD = args.save_path + 'point_cloud/'
+SAVE_PATH_RGB_IMG = args.save_path + 'rgb_images/'
 MOVING_AVERAGE_LENGTH = 10
 
 
@@ -263,7 +264,8 @@ def main():
         os.makedirs(SAVE_PATH_DYNAMIC)
     if not os.path.exists(SAVE_PATH_POINT_CLOUD):
         os.makedirs(SAVE_PATH_POINT_CLOUD)
-
+    if not os.path.exists(SAVE_PATH_RGB_IMG):
+        os.makedirs(SAVE_PATH_RGB_IMG)
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
@@ -278,7 +280,7 @@ def main():
                 port=args.port,
                 autopilot_on=args.autopilot,
                 save_images_to_disk=args.images_to_disk,
-                image_filename_format='_images/episode_{:0>3d}/{:s}/image_{:0>5d}.png',
+                image_filename_format= SAVE_PATH_RGB_IMG + 'episode_{:0>3d}/{:s}/image_{:0>5d}.png',
                 settings_filepath=args.carla_settings)
 
             print('Done.')

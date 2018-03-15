@@ -93,7 +93,7 @@ def main():
         data_max_elevation = get_max_elevation(frame, point_cloud, ROI, CELLS)
         filename = (PATH_INPUT + 'topviews/max_elevation/me_%i.csv') %frame
         np.savetxt(filename, data_max_elevation, delimiter=DELIMITER, \
-            comments=COMMENTS, fmt=PRECISION)
+            comments=COMMENTS, fmt='%u')
 
         # Save point count
         #data_count = lidar_to_topview('count', frame, point_cloud, ROI, CELLS)
