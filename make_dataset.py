@@ -164,14 +164,13 @@ def get_relative_location(x, y, yaw, new_x, new_y):
     theta = np.radians(-yaw - 90)
     c, s = np.cos(theta), np.sin(theta)
     R = np.array(((c,-s), (s, c)))
-    x, y = np.dot(np.transpose([x, -y]) ,R) # Clockqise rotation when pos the
+    x, y = np.dot(np.transpose([x, -y]) ,R) # Clockwise rotation when pos theta
     new_x, new_y = np.dot(np.transpose([new_x, -new_y]) ,R)
 
     # Shift locations so that location in current frame (x,y) is in origo
     relative_x = new_x - x
     relative_y = new_y - y
     return relative_x, relative_y
-    #return rel[0,0], rel[0,1]
 
 def get_forward_acceleration(acc_x, acc_y, acc_z):
     squares = np.power([acc_x, acc_y, acc_z], 2)

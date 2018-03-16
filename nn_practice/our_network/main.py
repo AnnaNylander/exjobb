@@ -287,5 +287,6 @@ def save_statistic(result_meter, path):
     values = numpy.array(result_meter.values)
     numpy.savetxt(path, values, comments='', delimiter=',',fmt='%.6f')
 
+
 if __name__ == '__main__':
     main()

@@ -15,7 +15,7 @@ args = parser.parse_args()
 image_folder = args.path
 
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-video = cv2.VideoWriter('video.avi', fourcc, 10.0, (640,480))
+video = cv2.VideoWriter('video.avi', , 10.0, (500,420)) #(640,480)
 
 images = []
 lenght = len(os.listdir(image_folder))
