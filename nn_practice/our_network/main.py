@@ -43,7 +43,7 @@ args = parser.parse_args()
 def main():
     # variables
     best_res = 10000 #big number
-    learning_rate = 1e-6 #1e-4 NOTE too large can give NaN in forward pass! (Use 1e-4 and lower)
+    learning_rate = 1e-5 #1e-4 NOTE too large can give NaN in forward pass! (Use 1e-4 and lower)
     epoch_start = 0
     step_start = 0
     train_losses = ResultMeter()

@@ -25,7 +25,7 @@ def lidar_to_topview(point_cloud, ROI, CELLS):
     grid = np.rot90(grid,2)
     return np.uint8(100*grid)
 
-def get_max_elevation(frame, point_cloud, ROI, CELLS):
+def get_max_elevation(frame, point_cloud, ROI = 60, CELLS = 600):
     grid = np.full([CELLS,CELLS,1], np.nan)
 
     for point in point_cloud:

@@ -28,6 +28,7 @@ import datetime
 import torch
 from network import Network
 from pure_pursuit import State, PIDControl, pure_pursuit_control, calc_target_index
+import client_util
 
 argparser = argparse.ArgumentParser(description=__doc__)
 argparser.add_argument(
@@ -85,6 +86,7 @@ SAVE_PATH_STATIC = args.save_path + 'static_measurements/'
 SAVE_PATH_DYNAMIC = args.save_path + 'dynamic_measurements/'
 SAVE_PATH_POINT_CLOUD = args.save_path + 'point_cloud/'
 SAVE_PATH_RGB_IMG = args.save_path + 'rgb_images/'
+N_PAST_STEPS = 30
 MOVING_AVERAGE_LENGTH = 10
 
 
@@ -169,6 +171,10 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             model = get_inference_model(planner_path)
             print('MODEL LOADED')
 
+            # Create container for values in previous steps, plus one to make use
+            # of existing code
+            prev_measurements = np.zeros([N_PAST_STEPS + 1, 22])
+
         # Iterate every frame in the episode.
         for frame in range(0,args.frames):
             # Time processing of each frame to estimate episode duration
@@ -182,7 +188,6 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             if frame == 1:
                 static_values = saver.get_static_measurements(measurements)
                 saver.save_static_measurements(static_values, SAVE_PATH_STATIC)
-
                 # Create csv header for objects with dynamic states
                 header_dynamic = saver.get_dynamic_measurements_header(measurements)
 
@@ -193,14 +198,18 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
                     image_filename_format.format(1, "CameraRGB", frame))
 
             # Save point cloud from current frame
-            saver.save_point_cloud(frame, sensor_data, SAVE_PATH_POINT_CLOUD)
+            point_cloud = saver.save_point_cloud(frame, sensor_data, \
+                SAVE_PATH_POINT_CLOUD)
 
             # Append player measurements for this frame
             pm = saver.get_player_measurements(measurements)
             player_values[frame,:] = pm
 
+            # Roll previous measurements to behave like a FIFO queue, then insert pm
+            np.roll(prev_measurements,-1,0)
+            prev_measurements[N_PAST_STEPS,:] = pm
+
             # Append non-player measurements for this frame
-            #dynamic_values[frame,:] =
             dynamic_objects = saver.get_dynamic_measurements(measurements)
             for key, value in dynamic_objects.items():
                 dynamic_values[key].append(value)
@@ -209,45 +218,60 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             # If we are in synchronous mode the server will pause the
             # simulation until we send this control.
             if planner_path is not None:
+                # Create point cloud
+                lidar = client_util.get_max_elevation(point_cloud)
+                # Create values vector for N_PAST_STEPS backwards in time.
+                # Since prev_measurements is N_PAST_STEPS, we can say that the current
+                # frame has index N_PAST_STEPS. Then get_input() will use the N_PAST_STEPS
+                # previous measurements available in prev_measurements.
+                # TODO Use actual info for traffic and intentions instead of None
+                input_values = client_util.get_input(prev_measurements, None, None,
+                    N_PAST_STEPS, N_PAST_STEPS)
+
                 # Run model
                 #output = model(lidar, values)
+
+                # Separate output into x and y
                 #cx, cy = output.data.view(-1,2)
-                cx = cy = list(range(0,30))
+                rel_x = -np.arange(30,0,-1)
+                rel_y = -np.arange(30,0,-1)
 
                 # Get current state
                 x, y, yaw, v = pm[2], pm[3], pm[11], pm[8]
-                state = State(x, y, yaw, v)
+                state = State(x, y, yaw, v/3.6)
 
-                # Translate from relative coordinates back into CARLA world coordinates
-                # TODO make function relative_to_world() and put in make_dataset
-                # translate the relative positions to
+                # Transform from relative coordinates back into CARLA world coordinates
+                world_x, world_y = client_util.relative_to_world(x, -y, yaw, rel_x, rel_y)
 
-                theta = np.radians(yaw + 90)
-                c, s = np.cos(theta), np.sin(theta)
-                R = np.array(((c,-s), (s, c)))
-                cx, cy = np.dot(np.transpose([cx, -cy]) ,R)
-                new_x, new_y = np.dot(np.transpose([world_x, -world_y]) ,R)
-
-                world_x = cx + x
-                world_y = cy + y
-
-                lastIndex = len(cx) - 1
-                target_ind = calc_target_index(state, cx, cy)
+                lastIndex = len(world_x) - 1
+                target_ind = calc_target_index(state, world_x, world_y)
 
                 # Calculate steer and throttle using pure pursuit
                 print("x: %.3f, y: %.3f, yaw: %.3f, v: %.3f" %(x,y,yaw,v))
 
-                target_speed = 30.0 / 3.6 # m/s
-                ai = PIDControl(target_speed, state.v)
-                di, target_ind = pure_pursuit_control(state, cx, cy, target_ind)
+                target_speed = 30.0/3.6 # km/h
+
+                # ai is the difference between current speed and target speed
+                ai = PIDControl(target_speed, state.v) # (More of a P controller...)
+
+                # di is what? steering angle relative the car yaw?
+                # TODO This obviously does not work, so find out what exactly di is.
+                di, target_ind = pure_pursuit_control(state, world_x, world_y, target_ind)
                 print("ai: %.3f, di: %.3f, target_ind: %.3f" %(ai, di, target_ind))
 
                 client.send_control(
-                    steer=random.uniform(-0.1, 0.1),
-                    throttle=0.5,
+                    steer=min(di,1.0),
+                    throttle=ai/target_speed,
                     brake=0.0,
                     hand_brake=False,
                     reverse=False)
+
+                #client.send_control(
+                #    steer=random.uniform(-0.1, 0.1),
+                #    throttle=0.5,
+                #    brake=0.0,
+                #    hand_brake=False,
+                #    reverse=False)
 
             elif autopilot_on:
                 # Together with the measurements, the server has sent the

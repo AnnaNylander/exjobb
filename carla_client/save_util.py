@@ -29,6 +29,8 @@ def save_point_cloud(frame, sensor_data, save_path):
     np.savetxt(save_path + "/pc_%i.csv" %frame, point_cloud, \
         fmt=POINT_CLOUD_PRECISION, comments=COMMENTS, delimiter=DELIMITER)
 
+    return point_cloud
+
 def save_player_measurements(measurements, save_path):
     # Save measurements of whole episode to one file
     header_player = get_player_measurements_header()
