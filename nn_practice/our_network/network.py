@@ -7,7 +7,7 @@ import torch
 
 class SmallerNetwork2(nn.Module):
     def __init__(self):
-        super(Network, self).__init__()
+        super(SmallerNetwork2, self).__init__()
 
         #encoder
         self.conv0 = nn.Conv2d(1,8,3, padding=1) # with elu #twice!
@@ -88,11 +88,11 @@ class SmallerNetwork2(nn.Module):
 
 class SmallerNetwork1(nn.Module):
     def __init__(self):
-        super(Network, self).__init__()
+        super(SmallerNetwork1, self).__init__()
 
         #encoder
-        self.conv1 = nn.Conv2d(1,4,3, padding=1)
-        self.conv2 = nn.Conv2d(4,4,3, padding=1)
+        self.conv0 = nn.Conv2d(1,4,3, padding=1)
+        self.conv1 = nn.Conv2d(4,4,3, padding=1)
         self.conv2 = nn.Conv2d(4,8,3, padding=1)
         self.conv3 = nn.Conv2d(8,8,3, padding=1)
         self.conv4 = nn.Conv2d(8,16,3, padding=1)
@@ -121,13 +121,13 @@ class SmallerNetwork1(nn.Module):
 
     def forward(self, l, v): # 600 x 600 x 1
         # encoder
+        l = F.elu(self.conv0(l)) # 600 x 600 x 4
         l = F.elu(self.conv1(l)) # 600 x 600 x 4
-        l = F.elu(self.conv2(l)) # 600 x 600 x 4
         l = self.maxpool2(l) # 300 x 300 x 4
+        l = F.elu(self.conv2(l)) # 300 x 300 x 8
         l = F.elu(self.conv3(l)) # 300 x 300 x 8
-        l = F.elu(self.conv4(l)) # 300 x 300 x 8
         l = self.maxpool3(l) # 100 x 100 x 8
-        l = F.elu(self.conv5(l)) # 100 x 100 x 16
+        l = F.elu(self.conv4(l)) # 100 x 100 x 16
         l = F.elu(self.conv5(l)) # 100 x 100 x 16
         l = self.maxpool3_2(l) # 34 x 34 x 16
 
@@ -141,6 +141,20 @@ class SmallerNetwork1(nn.Module):
         l = F.elu(self.Layer13(l)) # 34 x 34 x 16
 
         # decoder
+        if numpy.isnan(l.data).any():
+            print("oh no! l e fel")
+            print(numpy.shape(l))
+            print(l)
+            print(numpy.shape(v))
+            print(v)
+
+        if numpy.isnan(v.data).any():
+            print("v e fel")
+            print(numpy.shape(l))
+            print(l)
+            print(numpy.shape(v))
+            print(v)
+
         l = l.view(-1, 34*34*16) # 18496
         v = v.view(-1, 30*11)
         x = torch.cat((l,v),1) # 18826
@@ -152,7 +166,7 @@ class SmallerNetwork1(nn.Module):
 
 class LucaNetwork(nn.Module):
     def __init__(self):
-        super(Network, self).__init__()
+        super(LucaNetwork, self).__init__()
 
         #encoder
         self.conv0 = nn.Conv2d(1,8,3, padding=1) # with elu #twice!
@@ -194,7 +208,7 @@ class LucaNetwork(nn.Module):
         l = self.maxpool1(l) # 300 x 300 x 8
         l = F.elu(self.conv2(l)) # 300 x 300 x 16
         l = F.elu(self.conv3(l)) # 300 x 300 x 16
-        l = F.elu(self.conv3(l)) # 300 x 300 x 16
+        #l = F.elu(self.conv3(l)) # 300 x 300 x 16
         l = self.maxpool2(l) # 150 x 150 x 16
         #context module
         l = self.spatial_dropout(F.elu(self.Layer1(l))) # 150 x 150 x 96

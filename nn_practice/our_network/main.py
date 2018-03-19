@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 from data_to_dict import getData
 from dataset import OurDataset
-from network import Network
+from network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
 from result_meter import ResultMeter
 
 # NOTE! Validate during traning. Test is last when model finished traning.
@@ -43,7 +43,7 @@ args = parser.parse_args()
 def main():
     # variables
     best_res = 10000 #big number
-    learning_rate = 1e-6 #1e-4
+    learning_rate = 1e-6 #1e-4 NOTE too large can give NaN in forward pass! (Use 1e-4 and lower)
     epoch_start = 0
     step_start = 0
     train_losses = ResultMeter()
@@ -61,7 +61,7 @@ def main():
 
     # create model
     print("-----Creating network-----")
-    model = Network()
+    model = SmallerNetwork1()
     model.cuda()
     print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
 
@@ -93,14 +93,15 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     # TODO if evaluate flag is true, don't load all the datasets.
-    #validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 300))
-    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 600))
-    #train_dataset = OurDataset(getData(args.dataset_path + 'train/', 2100))
+    if not args.evaluate:
+        validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 500)) #2000
+        train_dataset = OurDataset(getData(args.dataset_path + 'train/', 4000)) #14000
+        dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
+                        shuffle=True, num_workers=4, pin_memory=True)
+        dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
+                        shuffle=False, num_workers=4, pin_memory=True)
 
-    #dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
-    #                shuffle=True, num_workers=4, pin_memory=True)
-    #dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
-    #                shuffle=False, num_workers=4, pin_memory=True)
+    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 500)) #4000
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=4, pin_memory=True)
 
@@ -209,7 +210,6 @@ def train(model, batch, loss_fn, optimizer):
 
 def validate(model, dataloader, loss_fn, save_output=False):
     model.eval() # switch to eval mode
-
     losses = ResultMeter()
 
     for i, batch in enumerate(dataloader):

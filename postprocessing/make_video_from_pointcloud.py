@@ -20,7 +20,7 @@ ROI = 60
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
 video = cv2.VideoWriter('video.avi', fourcc, 10.0, (600,600), False)
 
-for i in range(1,100):
+for i in range(1,20000):
     print(i)
     point_cloud = np.genfromtxt(image_folder + 'pc_%i.csv'%i, delimiter=',')
 

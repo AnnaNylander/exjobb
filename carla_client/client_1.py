@@ -25,6 +25,9 @@ import numpy as np
 import save_util as saver
 from collections import defaultdict
 import datetime
+import torch
+from network import Network
+from pure_pursuit import State, PIDControl, pure_pursuit_control, calc_target_index
 
 argparser = argparse.ArgumentParser(description=__doc__)
 argparser.add_argument(
@@ -68,6 +71,12 @@ argparser.add_argument(
     default='recorded_data/',
     dest='save_path',
     help='Number of frames to run the client')
+argparser.add_argument(
+    '-pl', '--planner-path',
+    metavar='PATH',
+    default=None,
+    dest='planner_path',
+    help='Path to planner checkpoint')
 
 args = argparser.parse_args()
 
@@ -79,7 +88,7 @@ SAVE_PATH_RGB_IMG = args.save_path + 'rgb_images/'
 MOVING_AVERAGE_LENGTH = 10
 
 
-def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filename_format, settings_filepath):
+def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk, image_filename_format, settings_filepath):
 
 
     # We assume the CARLA server is already waiting for a client to connect at
@@ -89,7 +98,6 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
     # context manager makes sure the connection is always cleaned up on exit.
     with make_carla_client(host, port) as client:
         print('CarlaClient connected')
-
 
         if settings_filepath is None:
 
@@ -153,7 +161,13 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
         player_values = np.zeros([args.frames,22])
         dynamic_values = defaultdict(list)
 
+        #Create container array for moving average
         frame_durations = MOVING_AVERAGE_LENGTH * [0]
+
+        # Load checkpoint
+        if planner_path is not None:
+            model = get_inference_model(planner_path)
+            print('MODEL LOADED')
 
         # Iterate every frame in the episode.
         for frame in range(0,args.frames):
@@ -182,7 +196,8 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
             saver.save_point_cloud(frame, sensor_data, SAVE_PATH_POINT_CLOUD)
 
             # Append player measurements for this frame
-            player_values[frame,:] = saver.get_player_measurements(measurements)
+            pm = saver.get_player_measurements(measurements)
+            player_values[frame,:] = pm
 
             # Append non-player measurements for this frame
             #dynamic_values[frame,:] =
@@ -193,7 +208,39 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
             # Now we have to send the instructions to control the vehicle.
             # If we are in synchronous mode the server will pause the
             # simulation until we send this control.
-            if not autopilot_on:
+            if planner_path is not None:
+                # Run model
+                #output = model(lidar, values)
+                #cx, cy = output.data.view(-1,2)
+                cx = cy = list(range(0,30))
+
+                # Get current state
+                x, y, yaw, v = pm[2], pm[3], pm[11], pm[8]
+                state = State(x, y, yaw, v)
+
+                # Translate from relative coordinates back into CARLA world coordinates
+                # TODO make function relative_to_world() and put in make_dataset
+                # translate the relative positions to
+
+                theta = np.radians(yaw + 90)
+                c, s = np.cos(theta), np.sin(theta)
+                R = np.array(((c,-s), (s, c)))
+                cx, cy = np.dot(np.transpose([cx, -cy]) ,R)
+                new_x, new_y = np.dot(np.transpose([world_x, -world_y]) ,R)
+
+                world_x = cx + x
+                world_y = cy + y
+
+                lastIndex = len(cx) - 1
+                target_ind = calc_target_index(state, cx, cy)
+
+                # Calculate steer and throttle using pure pursuit
+                print("x: %.3f, y: %.3f, yaw: %.3f, v: %.3f" %(x,y,yaw,v))
+
+                target_speed = 30.0 / 3.6 # m/s
+                ai = PIDControl(target_speed, state.v)
+                di, target_ind = pure_pursuit_control(state, cx, cy, target_ind)
+                print("ai: %.3f, di: %.3f, target_ind: %.3f" %(ai, di, target_ind))
 
                 client.send_control(
                     steer=random.uniform(-0.1, 0.1),
@@ -202,8 +249,7 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
                     hand_brake=False,
                     reverse=False)
 
-            else:
-
+            elif autopilot_on:
                 # Together with the measurements, the server has sent the
                 # control that the in-game autopilot would do this frame. We
                 # can enable autopilot by sending back this control to the
@@ -212,6 +258,13 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
                 control = measurements.player_measurements.autopilot_control
                 #control.steer += random.uniform(-0.1, 0.1)
                 client.send_control(control)
+            else:
+                client.send_control(
+                    steer=random.uniform(-0.1, 0.1),
+                    throttle=0.5,
+                    brake=0.0,
+                    hand_brake=False,
+                    reverse=False)
 
             # Print estimated time of arrival
             stop = time.time()
@@ -221,7 +274,7 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
             time_left = average_time * (args.frames-frame)
             m, s = divmod(time_left, 60)
             h, m = divmod(m, 60)
-            print("Frame %i - ETA %02d:%02d:%02d" % (frame, h, m, s))
+            #print("Frame %i - ETA %02d:%02d:%02d" % (frame, h, m, s))
 
         # Save measurements of whole episode to one file
         saver.save_player_measurements(player_values, SAVE_PATH_PLAYER)
@@ -232,6 +285,23 @@ def run_carla_client(host, port, autopilot_on, save_images_to_disk, image_filena
         episode_time = episode_end - episode_start
         print("Episode ended %s, duration %s" \
             % (episode_end.strftime("%Y-%m-%d %H:%M"), episode_time))
+
+def get_inference_model(filename):
+    # Check if checkpoint exists
+    if os.path.isfile(filename):
+        print("Loading model at '{}'".format(filename))
+    else:
+        print("No file found at '{}'".format(filename))
+        return None
+
+    # Load checkpoint
+    checkpoint = torch.load(filename)
+    model = Network()
+    model.cuda()
+    model.load_state_dict(checkpoint['state_dict'])
+    del checkpoint
+    print('Inference model successfully loaded!')
+    return model
 
 def print_measurements(measurements):
     number_of_agents = len(measurements.non_player_agents)
@@ -279,6 +349,7 @@ def main():
                 host=args.host,
                 port=args.port,
                 autopilot_on=args.autopilot,
+                planner_path=args.planner_path,
                 save_images_to_disk=args.images_to_disk,
                 image_filename_format= SAVE_PATH_RGB_IMG + 'episode_{:0>3d}/{:s}/image_{:0>5d}.png',
                 settings_filepath=args.carla_settings)

@@ -209,7 +209,6 @@ def save_dynamic_measurements(header, dynamic_values, save_path):
     objects = np.zeros([n_frames,n_objects])
 
     for i, key in enumerate(dynamic_values):
-        header += str(key) + ' '
         value = dynamic_values[key] # This is a list of states
         objects[:,i] = np.asarray(value)
 

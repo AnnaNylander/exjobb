@@ -48,6 +48,7 @@ def main():
     # else save all in folder.
     else:
         indices = getIndices(PATH_DATA)
+        print(indices)
         for i in indices:
             visualize(i, SAVE_PATH, args.prediction, args.everything)
             print(i)

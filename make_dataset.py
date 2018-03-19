@@ -31,7 +31,7 @@ N_STEPS_PAST = 30
 PRECISION = '%.8f'
 DELIMITER = ','
 COMMENTS = ''
-
+#TODO fix nan
 def main():
     ''' Generates input and output files for player player_measurements.
 
@@ -92,6 +92,7 @@ def main():
         # Save maximum elevation
         data_max_elevation = get_max_elevation(frame, point_cloud, ROI, CELLS)
         filename = (PATH_INPUT + 'topviews/max_elevation/me_%i.csv') %frame
+        data_max_elevation = np.squeeze(data_max_elevation, 2)
         np.savetxt(filename, data_max_elevation, delimiter=DELIMITER, \
             comments=COMMENTS, fmt='%u')
 

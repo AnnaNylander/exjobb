@@ -2,13 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 
-parser = argparse.ArgumentParser(description='Plot positions relative to car')
+parser = argparse.ArgumentParser(description='Plot training progress')
 parser.add_argument('--path', metavar='PATH', type=str,
                     dest='path', default='/saved/',
                     help='Path to folder with saved losses')
 parser.add_argument('--avg', metavar='N', type=int,
                     dest='avg', default=20,
                     help='Moving average windows size')
+
+parser.add_argument('--ylim', metavar='N', type=int,
+			dest='ylim', default=10, help='Y-axis positive limit')
 
 args = parser.parse_args()
 
@@ -37,7 +40,7 @@ def main():
 
     axes = plt.gca()
     axes.set_xlim([0,np.max(train[:,0])])
-    axes.set_ylim([0,5])
+    axes.set_ylim([0,args.ylim])
 
     plt.show()
 
