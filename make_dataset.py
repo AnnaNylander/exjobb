@@ -119,7 +119,8 @@ def get_input(measurements, intentions, traffic, frame, n_frames, n_steps):
         frame_index = max(frame_index,0)
         # Calculate relative location, forward acceleration etc.
         new_x, new_y = measurements[frame_index, [2, 3]]
-        v_rel_x, v_rel_y = get_relative_location(x, y, yaw, new_x, new_y)
+        # Notice the minus signs on y and new_y because of carla's world axes!
+        v_rel_x, v_rel_y = get_relative_location(x, -y, yaw, new_x, -new_y)
         acc_x, acc_y, acc_z = measurements[frame_index, [5, 6, 7]]
         v_forward_acceleration = get_forward_acceleration(acc_x, acc_y, acc_z)
         v_forward_speed = measurements[frame_index, 8]
@@ -155,7 +156,7 @@ def get_output(measurements, frame, n_frames, n_steps):
         # use last frame
         frame_index = min(frame_index, n_frames-1)
         new_x, new_y = measurements[frame_index, [2, 3]]
-        rel_x, rel_y = get_relative_location(x, y, yaw, new_x, new_y)
+        rel_x, rel_y = get_relative_location(x, -y, yaw, new_x, -new_y)
         data_output[future_step,:] = [rel_x, rel_y]
 
     return data_output
@@ -165,8 +166,8 @@ def get_relative_location(x, y, yaw, new_x, new_y):
     theta = np.radians(-yaw - 90)
     c, s = np.cos(theta), np.sin(theta)
     R = np.array(((c,-s), (s, c)))
-    x, y = np.dot(np.transpose([x, -y]) ,R) # Clockwise rotation when pos theta
-    new_x, new_y = np.dot(np.transpose([new_x, -new_y]) ,R)
+    x, y = np.dot(np.transpose([x, y]) ,R) # Clockwise rotation when pos theta
+    new_x, new_y = np.dot(np.transpose([new_x, new_y]) ,R)
 
     # Shift locations so that location in current frame (x,y) is in origo
     relative_x = new_x - x
