@@ -61,7 +61,7 @@ def main():
 
     # create model
     print("-----Creating network-----")
-    model = SmallerNetwork1()
+    model = LucaNetwork()
     model.cuda()
     print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
 
@@ -94,20 +94,22 @@ def main():
     print("-----Loading datasets-----")
     # TODO if evaluate flag is true, don't load all the datasets.
     if not args.evaluate:
-        validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 500)) #2000
-        train_dataset = OurDataset(getData(args.dataset_path + 'train/', 4000)) #14000
+        validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 1000)) #2000
+        train_dataset = OurDataset(getData(args.dataset_path + 'train/', 7000)) #14000
         dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
-                        shuffle=True, num_workers=4, pin_memory=True)
+                        shuffle=True, num_workers=4, pin_memory=False)
         dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
-                        shuffle=False, num_workers=4, pin_memory=True)
+                        shuffle=False, num_workers=4, pin_memory=False)
 
-    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 500)) #4000
+    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 3000)) #4000
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
-                    shuffle=False, num_workers=4, pin_memory=True)
+                    shuffle=False, num_workers=4, pin_memory=False)
 
     # Train network
     if not args.evaluate:
         print("______TRAIN MODEL_______")
+        if not os.path.exists(args.save_path):
+                os.makedirs(args.save_path)
         main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     validation_losses, times, dataloader_train, dataloader_val,
                     best_res, all_time_best_res)

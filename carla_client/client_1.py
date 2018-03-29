@@ -26,9 +26,10 @@ import save_util as saver
 from collections import defaultdict
 import datetime
 import torch
-from network import Network
+from network import SmallerNetwork2
 from pure_pursuit import State, PIDControl, pure_pursuit_control, calc_target_index
 import client_util
+from torch.autograd import Variable
 
 argparser = argparse.ArgumentParser(description=__doc__)
 argparser.add_argument(
@@ -84,10 +85,13 @@ args = argparser.parse_args()
 SAVE_PATH_PLAYER = args.save_path + 'player_measurements/'
 SAVE_PATH_STATIC = args.save_path + 'static_measurements/'
 SAVE_PATH_DYNAMIC = args.save_path + 'dynamic_measurements/'
+SAVE_PATH_PREDICTIONS = args.save_path + 'generated_output/'
 SAVE_PATH_POINT_CLOUD = args.save_path + 'point_cloud/'
 SAVE_PATH_RGB_IMG = args.save_path + 'rgb_images/'
+ANNOTATIONS_PATH = '/media/annaochjacob/crucial/annotations/path_2018_03_27/'
 N_PAST_STEPS = 30
 MOVING_AVERAGE_LENGTH = 10
+STEERING_MAX = 70 # angle in degrees
 
 
 def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk, image_filename_format, settings_filepath):
@@ -147,7 +151,7 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
 
         # Choose one player start at random.
         number_of_player_starts = len(scene.player_start_spots)
-        player_start = random.randint(0, max(0, number_of_player_starts - 1))
+        player_start = 56
 
         # Notify the server that we want to start the episode at the
         # player_start index. This function blocks until the server is ready
@@ -162,18 +166,22 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
         # Create placeholders for measurement values
         player_values = np.zeros([args.frames,22])
         dynamic_values = defaultdict(list)
-
+        static_values = []
         #Create container array for moving average
         frame_durations = MOVING_AVERAGE_LENGTH * [0]
 
         # Load checkpoint
-        if planner_path is not None:
+        if planner_path is not None: #we have predictions
             model = get_inference_model(planner_path)
             print('MODEL LOADED')
 
+            intentions_path = np.genfromtxt( ANNOTATIONS_PATH + 'intentions_path.csv', names=True, delimiter=' ')
+            traffic_path = np.genfromtxt( ANNOTATIONS_PATH + 'traffic_path.csv', names=True, delimiter=' ')
             # Create container for values in previous steps, plus one to make use
             # of existing code
             prev_measurements = np.zeros([N_PAST_STEPS + 1, 22])
+            prev_intentions = np.zeros([N_PAST_STEPS + 1, 2]) #direction, distance
+            prev_traffic = np.zeros([N_PAST_STEPS + 1, 4]) #distance, current_limit, next_limit, light_status
 
         # Iterate every frame in the episode.
         for frame in range(0,args.frames):
@@ -183,13 +191,40 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             # Read the data produced by the server this frame.
             measurements, sensor_data = client.read_data()
 
+            # Append player measurements for this frame
+            pm = saver.get_player_measurements(measurements)
+            player_values[frame,:] = pm
+
+            # Append non-player measurements for this frame
+            dynamic_objects = saver.get_dynamic_measurements(measurements)
+            for key, value in dynamic_objects.items():
+                dynamic_values[key].append(value)
+
             # If first frame, get static info about non-player agents and save
             # to csv file. Also, get header for dynamic measurements
-            if frame == 1:
+            if frame == 0:
                 static_values = saver.get_static_measurements(measurements)
                 saver.save_static_measurements(static_values, SAVE_PATH_STATIC)
                 # Create csv header for objects with dynamic states
                 header_dynamic = saver.get_dynamic_measurements_header(measurements)
+
+                if planner_path is not None:
+                    #find all traffic light ids and stuff.
+                    traffic_path = client_util.find_traffic_sign_ids(static_values, traffic_path)
+                    prev_measurements = np.tile(pm, (N_PAST_STEPS +1, 1))
+
+                    #TODO init intentions and traffic
+                    prev_intentions = np.tile([intentions_path[0][2],intentions_path[0][3]],
+                        (N_PAST_STEPS + 1, 1))
+                    traffic_id = traffic_path['id'][0]
+                    isTrafficLight = True if static_values[traffic_id]['type'] == 3 else False
+                    if isTrafficLight:
+                        prev_traffic = np.tile([traffic_path['next_distance'][0],30,0,0],
+                            (N_PAST_STEPS + 1, 1))
+                    else:
+                        prev_traffic =  np.tile([traffic_path['next_distance'][0],
+                            30,static_values[traffic_id]['speed_limit'],0], (N_PAST_STEPS +1, 1))
+                    #[next_distance, current_speed_limit, next_speed_limit, light_status],
 
             # Save front facing RGB camera images
             if save_images_to_disk:
@@ -201,23 +236,35 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             point_cloud = saver.save_point_cloud(frame, sensor_data, \
                 SAVE_PATH_POINT_CLOUD)
 
-            # Append player measurements for this frame
-            pm = saver.get_player_measurements(measurements)
-            player_values[frame,:] = pm
 
-            # Roll previous measurements to behave like a FIFO queue, then insert pm
-            np.roll(prev_measurements,-1,0)
-            prev_measurements[N_PAST_STEPS,:] = pm
-
-            # Append non-player measurements for this frame
-            dynamic_objects = saver.get_dynamic_measurements(measurements)
-            for key, value in dynamic_objects.items():
-                dynamic_values[key].append(value)
 
             # Now we have to send the instructions to control the vehicle.
             # If we are in synchronous mode the server will pause the
             # simulation until we send this control.
             if planner_path is not None:
+                # Roll previous measurements to behave like a FIFO queue, then insert pm
+                prev_measurements = np.roll(prev_measurements,-1,0)
+                prev_measurements[N_PAST_STEPS,:] = pm
+                print(prev_measurements[N_PAST_STEPS,:])
+
+                #Calculate intentions
+                intention, flag = client_util.GetIntention(prev_measurements, prev_intentions, intentions_path)
+                # Roll previous measurements to behave like a FIFO queue, then insert pm
+                prev_intentions = np.roll(prev_intentions,1,0)
+                prev_intentions[0,:] = intention
+                print(intention)
+                if flag: # delete first row of path
+                    intentions_path = np.delete(intentions_path,0,0)
+
+                #Calculate traffic
+                traffic, flag = client_util.GetTraffic(prev_measurements, static_values, dynamic_values, prev_traffic, traffic_path)
+                print(traffic)
+                # Roll previous measurements to behave like a FIFO queue, then insert pm
+                prev_traffic = np.roll(prev_traffic,1,0)
+                prev_traffic[0,:] = traffic
+                if flag: # delete first row of path
+                    traffic_path = np.delete(traffic_path,0,0)
+
                 # Create point cloud
                 lidar = client_util.get_max_elevation(point_cloud)
                 # Create values vector for N_PAST_STEPS backwards in time.
@@ -225,16 +272,27 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
                 # frame has index N_PAST_STEPS. Then get_input() will use the N_PAST_STEPS
                 # previous measurements available in prev_measurements.
                 # TODO Use actual info for traffic and intentions instead of None
-                input_values = client_util.get_input(prev_measurements, None, None,
+                input_values = client_util.get_input(prev_measurements, prev_intentions, prev_traffic,
                     N_PAST_STEPS, N_PAST_STEPS)
 
-                # Run model
-                #output = model(lidar, values)
+                lidars = Variable(torch.cuda.FloatTensor(lidar))
+                values = Variable(torch.cuda.FloatTensor(input_values))
+                lidars = lidars.view(-1, 1, 600, 600)
+                values = values.view(-1, 30, 11)
 
+                # Run model
+                output = model(lidars, values)
+                #output = output.data.cpu().numpy().squeeze()
+                output = output.data.view(-1,2).cpu().numpy()
+                print(output)
                 # Separate output into x and y
-                #cx, cy = output.data.view(-1,2)
-                rel_x = -np.arange(30,0,-1)
-                rel_y = -np.arange(30,0,-1)
+                rel_x = output[:,0]
+                rel_y = output[:,1]
+
+                client_util.generate_output(frame, [rel_x, rel_y], SAVE_PATH_PREDICTIONS)
+
+                #rel_x = np.zeros(30)
+                #rel_y = -np.arange(0,30)
 
                 # Get current state
                 x, y, yaw, v = pm[2], pm[3], pm[11], pm[8]
@@ -249,20 +307,31 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
                 # Calculate steer and throttle using pure pursuit
                 print("x: %.3f, y: %.3f, yaw: %.3f, v: %.3f" %(x,y,yaw,v))
 
-                target_speed = 30.0/3.6 # km/h
+                s = client_util.getEulerDistance((rel_x[0], rel_y[0]),(rel_x[29], rel_y[29]))
+                target_speed = s/(3)
+                print(target_speed)
+                target_speed = target_speed*3.6
+                print(target_speed)
+                brake = 0.0
+                #target_speed = 30.0/3.6 # km/h
+                if v > target_speed:
+                    brake = 0.5
 
                 # ai is the difference between current speed and target speed
                 ai = PIDControl(target_speed, state.v) # (More of a P controller...)
 
-                # di is what? steering angle relative the car yaw?
-                # TODO This obviously does not work, so find out what exactly di is.
+                # di is the desired steering angle in radians
                 di, target_ind = pure_pursuit_control(state, world_x, world_y, target_ind)
-                print("ai: %.3f, di: %.3f, target_ind: %.3f" %(ai, di, target_ind))
+                # Ensure we stick to car's physical limits
+                di = min(di,np.deg2rad(STEERING_MAX))
+                di = max(di,np.deg2rad(-STEERING_MAX))
+                print("throttle: %.3f, brake: %.3f, steer: %.3f, target_ind: %.3f" %(ai/target_speed, brake,
+                    np.rad2deg(di), target_ind))
 
                 client.send_control(
-                    steer=min(di,1.0),
-                    throttle=ai/target_speed,
-                    brake=0.0,
+                    steer=np.rad2deg(di)/STEERING_MAX,
+                    throttle= ai/target_speed,
+                    brake=brake,
                     hand_brake=False,
                     reverse=False)
 
@@ -298,7 +367,7 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             time_left = average_time * (args.frames-frame)
             m, s = divmod(time_left, 60)
             h, m = divmod(m, 60)
-            #print("Frame %i - ETA %02d:%02d:%02d" % (frame, h, m, s))
+            print("Frame %i - ETA %02d:%02d:%02d" % (frame, h, m, s))
 
         # Save measurements of whole episode to one file
         saver.save_player_measurements(player_values, SAVE_PATH_PLAYER)
@@ -320,7 +389,7 @@ def get_inference_model(filename):
 
     # Load checkpoint
     checkpoint = torch.load(filename)
-    model = Network()
+    model = SmallerNetwork2()
     model.cuda()
     model.load_state_dict(checkpoint['state_dict'])
     del checkpoint

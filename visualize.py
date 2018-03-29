@@ -36,7 +36,7 @@ SIDE = 60
 PATH_DATA = args.dataset
 PATH_POINT_CLOUD = args.recorded + 'point_cloud/'
 PATH_PREDICTION = args.saved_models + 'generated_output/'
-SAVE_PATH = args.dataset + 'images/'
+SAVE_PATH = args.save_path
 SUBPLOT_ROWS = 1
 SUBPLOT_COLS = 1
 
@@ -48,7 +48,6 @@ def main():
     # else save all in folder.
     else:
         indices = getIndices(PATH_DATA)
-        print(indices)
         for i in indices:
             visualize(i, SAVE_PATH, args.prediction, args.everything)
             print(i)

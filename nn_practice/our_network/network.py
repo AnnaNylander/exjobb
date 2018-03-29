@@ -37,8 +37,8 @@ class SmallerNetwork2(nn.Module):
 
         #extra convolutions # 150 x 150 x 16
         self.exconv1 = nn.Conv2d(16,16,3, padding=1)
-        self.exmaxpool1 = nn.Conv2d(3, stride=3) # 50 x 50
-        self.exmaxpool2 = nn.Conv2d(2, stride=2) # 25 x 25 x 16
+        self.exmaxpool1 = nn.MaxPool2d(3, stride=3) # 50 x 50
+        self.exmaxpool2 = nn.MaxPool2d(2, stride=2) # 25 x 25 x 16
 
         #decoder #all followed by elu
         #concatenate new values here
@@ -53,7 +53,7 @@ class SmallerNetwork2(nn.Module):
         l = self.maxpool1(l) # 300 x 300 x 8
         l = F.elu(self.conv2(l)) # 300 x 300 x 16
         l = F.elu(self.conv3(l)) # 300 x 300 x 16
-        l = F.elu(self.conv3(l)) # 300 x 300 x 16
+        #l = F.elu(self.conv3(l)) # 300 x 300 x 16
         l = self.maxpool2(l) # 150 x 150 x 16
         #context module
         l = self.spatial_dropout(F.elu(self.Layer1(l))) # 150 x 150 x 96
@@ -140,21 +140,7 @@ class SmallerNetwork1(nn.Module):
         l = self.spatial_dropout(F.elu(self.Layer12(l))) # 34 x 34 x 96
         l = F.elu(self.Layer13(l)) # 34 x 34 x 16
 
-        # decoder
-        if numpy.isnan(l.data).any():
-            print("oh no! l e fel")
-            print(numpy.shape(l))
-            print(l)
-            print(numpy.shape(v))
-            print(v)
-
-        if numpy.isnan(v.data).any():
-            print("v e fel")
-            print(numpy.shape(l))
-            print(l)
-            print(numpy.shape(v))
-            print(v)
-
+        #decoder
         l = l.view(-1, 34*34*16) # 18496
         v = v.view(-1, 30*11)
         x = torch.cat((l,v),1) # 18826
