@@ -1,6 +1,7 @@
 import numpy as np
 from preprocessing.depth_to_point_cloud import depth_to_point_cloud
 from preprocessing.point_cloud_to_image import trim_to_roi
+import datetime
 
 ROI = 60        # Region of interest side length, in meters.
 FAR = 1000      # Far plane distance
@@ -216,3 +217,26 @@ def save_dynamic_measurements(header, dynamic_values, save_path):
 
     np.savetxt(save_path + "/dm.csv", objects, fmt=MEASUREMENTS_PRECISION, \
         header=header, comments=COMMENTS, delimiter=DELIMITER)
+
+def save_info(save_path, settings, args):
+    now = datetime.datetime.now()
+    now.strftime("%Y-%m-%d-%H-%M-%S")
+    filename = save_path + 'info.txt'
+    with open(filename, 'w+') as info_file:
+        info = [
+            'Session name: %s' % args.session_name,
+            'Recording start: %s' % now.strftime("%Y-%m-%d-%H-%M-%S"),
+            'Settings: %s' % args.carla_settings,
+            'Frames: %i' % args.frames,
+            'Autopilot: %s' % str(args.autopilot),
+            'Planner: %s' % args.planner_path
+
+            # TODO Get these to work...
+            #'SynchronousMode: %s' % str(settings.SynchronousMode),
+            #'NumberOfVehicles: %i' % settings.NumberOfVehicles
+            #'NumberOfPedestrians: %i' % settings.NumberOfVehicles,
+            #'WeatherId: %i' % settings.WeatherId,
+            #'SeedVehicles: %i' % settings.SeedVehicles,
+            #'SeedPedestrians: %i' % settings.SeedPedestrians
+            ]
+        info_file.write('\n'.join(info))
