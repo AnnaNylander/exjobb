@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image
 import argparse
 
+
 parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
 parser.add_argument('--path', metavar='file.csv',
                     dest='path', default='/media/annaochjacob/crucial/recorded_data/carla/recorded_data_2018-03-07/point_cloud/',

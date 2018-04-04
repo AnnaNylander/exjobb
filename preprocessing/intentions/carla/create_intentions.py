@@ -3,9 +3,10 @@ import json
 import argparse
 import math
 import numpy
-from intentions.carla.get_intentions import getData, getDataTraffic
-from intentions.carla.create_json_intentions import create_json as intentions_json
-from intentions.carla.create_json_traffic import create_json as traffic_json
+
+from preprocessing.intentions.carla.get_intentions import getData, getDataTraffic
+from preprocessing.intentions.carla.create_json_intentions import create_json as intentions_json
+from preprocessing.intentions.carla.create_json_traffic import create_json as traffic_json
 
 
 #parser = argparse.ArgumentParser(description='Calculate intentions')
@@ -14,7 +15,7 @@ from intentions.carla.create_json_traffic import create_json as traffic_json
 
 #args = parser.parse_args()
 
-def main(args):
+def create_intentions(args):
     """ Read GPS-IMU values from csv file and calculate intentions.
     Then write the intentions to a new csv file. Also writing traffic intentions."""
 
@@ -72,4 +73,4 @@ def main(args):
 
 
 if __name__=="__main__":
-    main(args)
+    create_intentions(args)

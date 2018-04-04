@@ -1,37 +1,38 @@
 import os
 import numpy as np
 import argparse
-from lidar_to_topview.main import lidar_to_topview, get_max_elevation
-from intentions.carla.main import main as create_intentions
+from util import lidar_to_topview, get_max_elevation
+import intentions.carla.create_intentions as create_intentions
 import time
 
 parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
 parser.add_argument('--save-path', metavar='path',
                     dest='save_path', default='dataset/',
-                    help='Where to save the dataset')
+                    help='Foldername in /media/annaochjacob/crucial/dataset/ ex \'dataset_2018_03_14/\' (with trailing /)')
 parser.add_argument('--data-path', metavar='path',
                     dest='data_path', default='recorded_data/',
-                    help='Where to fetch the recorded data')
+                    help='Foldername in /media/annaochjacob/crucial/recorded_data/ ex \'recorded_data_2018_03_14/\' (with trailing /)')
 args = parser.parse_args()
 
 # Define paths to data locations
 ROI = 60
 CELLS = 600
+PATH_BASE = '/media/annaochjacob/crucial/'
+ #TODO
+PATH_POINT_CLOUDS =  PATH_BASE + args.data_path + 'point_cloud/'
+PATH_PLAYER = PATH_BASE + args.data_path + 'player_measurements/'
+PATH_INTENTIONS = PATH_BASE + args.data_path + 'intentions/'
+PATH_TRAFFIC = PATH_BASE + args.data_path + 'traffic_awareness/'
 
-PATH_POINT_CLOUDS =  args.data_path + 'point_cloud/'
-PATH_PLAYER = args.data_path + 'player_measurements/'
-PATH_INTENTIONS = args.data_path + 'intentions/'
-PATH_TRAFFIC = args.data_path + 'traffic_awareness/'
-
-PATH_INPUT = args.save_path + 'input/'
-PATH_OUTPUT = args.save_path + 'output/'
+PATH_INPUT = PATH_BASE + args.save_path + 'input/'
+PATH_OUTPUT = PATH_BASE + args.save_path + 'output/'
 
 N_STEPS_FUTURE = 30
 N_STEPS_PAST = 30
 PRECISION = '%.8f'
 DELIMITER = ','
 COMMENTS = ''
-#TODO fix nan
+
 def main():
     ''' Generates input and output files for player player_measurements.
 
@@ -42,7 +43,6 @@ def main():
 
     #First of all, create intentions and traffic awareness files.
     create_intentions(args)
-
 
     # Create directories
     if not os.path.exists(args.save_path):
@@ -64,11 +64,9 @@ def main():
     m_traffic = np.genfromtxt(PATH_TRAFFIC + 'traffic.csv', delimiter=',', names=True)
     n_frames = np.size(m_player,0)
     print('Found a total of %i frames' %n_frames)
-    #m_traffic_csvreader = csv.reader()
 
     # for each frame in recorded data
-    #for frame in range(0,n_frames):
-    for frame in range(0,n_frames): #range(330,391):
+    for frame in range(0,n_frames):
         start = time.time()
 
         data_input = get_input(m_player, m_intentions, m_traffic, frame, n_frames, N_STEPS_PAST)
@@ -139,7 +137,6 @@ def get_input(measurements, intentions, traffic, frame, n_frames, n_steps):
         frame_input[8] = traffic['current_speed_limit'][frame_index] # current_speed_limit
         frame_input[9] = traffic['next_speed_limit'][frame_index] # next_speed_limit (MIGHT BE NULL!)
         frame_input[10] = traffic['light_status'][frame_index] # traffic light status (MIGHT BE NULL!)
-
 
         all_inputs[past_step,:] = np.transpose(frame_input)
 

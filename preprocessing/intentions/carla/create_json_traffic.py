@@ -3,7 +3,7 @@ import json
 import argparse
 import math
 import numpy
-from intentions.carla.util import getEulerDistance, isWithinRadius
+from preprocessing.intentions.carla.util import getEulerDistance, isWithinRadius
 
 #parser = argparse.ArgumentParser(description='Create json file')
 #parser.add_argument('--path', metavar='PATH', dest='path',

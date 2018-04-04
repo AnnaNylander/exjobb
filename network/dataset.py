@@ -27,5 +27,6 @@ class OurDataset(Dataset):
         return len(self.indices)
 
     def __getitem__(self, idx):
-        return {'indices': self.indices[idx], 'lidar': self.lidars[idx], \
+        lidar = np.genfromtxt(self.lidars[idx], delimiter=',')
+        return {'indices': self.indices[idx], 'lidar': lidar, \
                 'value': self.values[idx], 'output': self.outputs[idx]}

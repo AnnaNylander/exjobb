@@ -9,18 +9,18 @@ import shutil
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
+
+from architectures import *
 from data_to_dict import getData
 from dataset import OurDataset
-from network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
+#from architectures.network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
 from result_meter import ResultMeter
 
 # NOTE! Validate during traning. Test is last when model finished traning.
 
-parser = argparse.ArgumentParser(description='PyTorch Cifar-10 classification')
-parser.add_argument('--resume', default='', type=str, metavar='PATH',
-                    help='path to latest checkpoint (default: none)')
-parser.add_argument('--evaluate', dest='evaluate', action='store_true',
-                    help='evaluate model on validation set')
+parser = argparse.ArgumentParser(description='PyTorch Drive a car wohoo')
+parser.add_argument('--arch', default='', type=str, metavar='file.class()',
+                    help = 'Name of network to use. eg: LucaNetwork.LucaNet()')
 parser.add_argument('-b', '--batch-size', default=20, type=int,
                     metavar='N', help='mini-batch size (default: 20)')
 parser.add_argument('-e', '--epochs', default=10, type=int,
@@ -29,16 +29,21 @@ parser.add_argument('--print-freq', '-p', default=100, type=int,
                     metavar='N', help='print frequency (default: 100)')
 parser.add_argument('--plot-freq', '-pl', default=100, type=int,
                     metavar='N', dest='plot_freq', help='plot frequency (default: 100 batch)')
-parser.add_argument('--dataset', dest='dataset_path', default='./dataset/',
-                    type=str, metavar='PATH', help = 'path to dataset folder.')
-parser.add_argument('--save-path', dest='save_path', default='./saved/',
-                    type=str, metavar='PATH', help = 'path to where to save models.')
+parser.add_argument('--resume', default='', type=str, metavar='PATH',
+                    help='Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/\' (with trailing /)')
+parser.add_argument('--evaluate', dest='evaluate', action='store_true',
+                    help='evaluate model on validation set')
+parser.add_argument('--dataset', dest='dataset_path', default='temp/',
+                    type=str, metavar='PATH', help = 'Name of folder in /media/annaochjacob/crucial/dataset/ ex \'Banana_split/\' (with trailing /)')
+parser.add_argument('--save-path', dest='save_path', default='temp/',
+                    type=str, metavar='PATH', help = 'Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/\' (with trailing /)')
 
 args = parser.parse_args()
-# TODO variate learning_rate depending on epoch.
-# TODO save checkpoints
-# TODO continue to train on checkpoint.
-# TODO more things to measure??
+
+PATH_BASE = '/media/annaochjacob/crucial/'
+PATH_RESUME = PATH_BASE + 'models/' + args.resume
+PATH_SAVE = PATH_BASE + 'models/' + args.save_path
+PATH_DATA = PATH_BASE + 'dataset/' + args.dataset_path
 
 def main():
     # variables
@@ -49,35 +54,50 @@ def main():
     train_losses = ResultMeter()
     validation_losses = ResultMeter()
     times = ResultMeter()
+    arch = args.arch
 
     # load all time best
     print("-----Load all time best loss (for comparision)-----")
     all_time_best_res = 10000 # big number
-    all_time_best = load_checkpoint( args.save_path + 'all_time_best.pt')
+    all_time_best = load_checkpoint( PATH_SAVE + 'all_time_best.pt')
     if all_time_best is not None:
         all_time_best_res = all_time_best['best_res']
         print("avg loss @:",all_time_best_res)
         del all_time_best # Remove from GPU memory
 
-    # create model
-    print("-----Creating network-----")
-    model = LucaNetwork()
-    model.cuda()
-    print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
+    # create new model and lossfunctions and stuff
+    if not args.resume:
+        print("-----Creating network-----")
+        model = eval(arch)
+        model.cuda()
+        print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
 
-    # define loss function and optimizer
-    print("-----Creating lossfunction and optimizer-----")
-    loss_fn = torch.nn.MSELoss().cuda()
-    #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+        # define loss function and optimizer
+        print("-----Creating lossfunction and optimizer-----")
+        loss_fn = torch.nn.MSELoss().cuda()
+        #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
 
     #resume from checkpoint
     if args.resume:
-        print("Resume from checkpoint:")
+        print("----Resume from checkpoint:-----")
         checkpoint = load_checkpoint(args.resume)
         if checkpoint is None:
             print("No file found. Exiting...")
             return
+        # model
+        print("\t Creating network")
+        arch = checkpoint['arch']
+        model = eval(arch)
+        model.cuda()
+        print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
+        # loss function and optimizer
+        print("\t Creating lossfunction and optimizer")
+        loss_fn = torch.nn.MSELoss().cuda()
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+
+        #load variables
+        print("\t Loading variables")
         epoch_start = checkpoint['epoch']
         step_start = checkpoint['step']
         model.load_state_dict(checkpoint['state_dict'])
@@ -94,22 +114,22 @@ def main():
     print("-----Loading datasets-----")
     # TODO if evaluate flag is true, don't load all the datasets.
     if not args.evaluate:
-        validate_dataset = OurDataset(getData(args.dataset_path + 'validate/', 1000)) #2000
-        train_dataset = OurDataset(getData(args.dataset_path + 'train/', 7000)) #14000
+        validate_dataset = OurDataset(getData(PATH_DATA + 'validate/', 1000)) #2000
+        train_dataset = OurDataset(getData(PATH_DATA + 'train/', 7000)) #14000
         dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
                         shuffle=True, num_workers=4, pin_memory=False)
         dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
                         shuffle=False, num_workers=4, pin_memory=False)
 
-    test_dataset = OurDataset(getData(args.dataset_path + 'test/', 3000)) #4000
+    test_dataset = OurDataset(getData(PATH_DATA + 'test/', 3000)) #4000
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=4, pin_memory=False)
 
     # Train network
     if not args.evaluate:
         print("______TRAIN MODEL_______")
-        if not os.path.exists(args.save_path):
-                os.makedirs(args.save_path)
+        if not os.path.exists(PATH_SAVE):
+                os.makedirs(PATH_SAVE)
         main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     validation_losses, times, dataloader_train, dataloader_val,
                     best_res, all_time_best_res)
@@ -150,8 +170,8 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                 validation_losses.update(epoch + 1, i + 1, step, validation_loss)
 
                 # Save losses to csv for plotting
-                save_statistic(train_losses, args.save_path + 'train_losses.csv')
-                save_statistic(validation_losses, args.save_path + 'validation_losses.csv')
+                save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
+                save_statistic(validation_losses, PATH_SAVE + 'validation_losses.csv')
 
             step += 1
             #end of dataloader loop
@@ -170,6 +190,7 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
 
         # Save checkpoint
         save_checkpoint({
+            'arch' : arch
             'epoch': epoch + 1,
             'step' : step + 1,
             'state_dict': model.state_dict(),
@@ -234,7 +255,7 @@ def validate(model, dataloader, loss_fn, save_output=False):
         if save_output:
             current_batch_size = numpy.size(output,0)
             outputs = numpy.split(output.data, current_batch_size, 0)
-            path = args.save_path + 'generated_output/'
+            path = PATH_SAVE + 'generated_output/'
             generate_output(indices, outputs, i, path)
 
         # Document results
@@ -253,14 +274,14 @@ def generate_output(indices, outputs, batch_index, path):
                         header='x,y')
 
 def save_checkpoint(state, is_best, is_all_time_best,
-        filename = args.save_path + 'checkpoint.pt'):
+        filename = PATH_SAVE + 'checkpoint.pt'):
     torch.save(state, filename)
     #if is_best:
     #    print("Best so far!")
-    #    shutil.copyfile(filename, args.save_path + 'best.pt')
+    #    shutil.copyfile(filename, PATH_SAVE + 'best.pt')
     if is_all_time_best:
         print("ALL TIME BEST! GOOD JOB!")
-        shutil.copyfile(filename, args.save_path + 'all_time_best.pt')
+        shutil.copyfile(filename, PATH_SAVE + 'all_time_best.pt')
     #print("\n")
 
 def load_checkpoint(filename):
@@ -272,9 +293,6 @@ def load_checkpoint(filename):
         print("No file found at '{}'".format(filename))
         return None
 
-def accuracy(output, target):
-    """ Not implemented yet. Unsure exactly what we want."""
-
 def get_n_params(model):
     pp = 0
     for p in list(model.parameters()):
@@ -285,7 +303,6 @@ def get_n_params(model):
     return pp
 
 def save_statistic(result_meter, path):
-    #TODO check that path parent directory exists
     values = numpy.array(result_meter.values)
     numpy.savetxt(path, values, comments='', delimiter=',',fmt='%.6f')
 
