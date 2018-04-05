@@ -6,6 +6,29 @@ ELEVATION_MIN = -18
 
 #point_cloud = np.loadtxt('data/hej.csv', delimiter=' ')
 #point_cloud = trim_to_roi(point_cloud,ROI)
+def main():
+    filaname700k = '/home/annaochjacob/Documents/MATLAB/ply_test/pc_34.csv'
+    #filename100k = '/home/annaochjacob/Documents/MATLAB/ply_test/000006.ply'
+    point_cloud = np.loadtxt(filaname700k, delimiter=',', skiprows=1)
+
+    point_cloud = trim_to_roi(point_cloud, 60)
+    print(np.max(point_cloud))
+
+    # Save maximum elevation
+    data_max_elevation = get_max_elevation(1, point_cloud)
+    #filename = (PATH_INPUT + 'topviews/max_elevation/me_%i.csv') %frame
+    data_max_elevation = np.squeeze(data_max_elevation, 2)
+    img = Image.fromarray(data_max_elevation)
+
+    img.show()
+
+    #np.savetxt(filename, data_max_elevation, delimiter=DELIMITER, \
+    #    comments=COMMENTS, fmt='%u')
+
+def trim_to_roi(point_cloud,roi):
+    """ Remove points outside ROI."""
+    inside_roi = np.max(np.absolute(point_cloud), axis=1) < roi/2
+    return point_cloud[inside_roi]
 
 def lidar_to_topview(point_cloud, ROI, CELLS):
     grid = np.zeros([CELLS,CELLS,1])
@@ -45,9 +68,8 @@ def get_max_elevation(frame, point_cloud, ROI = 60, CELLS = 600):
     grid = np.nan_to_num(grid) # Replace all nans with zeros
     grid = grid/(ELEVATION_MAX - ELEVATION_MIN)
     grid = grid + 0.5
-    grid = np.rot90(grid,2)
+    grid = np.rot90(grid,1)
     return np.uint8(grid*255)
-
     #return np.uint8(100*grid) #enhance contrast
     #img = Image.fromarray(grid)
     #img = img.rotate(180)
