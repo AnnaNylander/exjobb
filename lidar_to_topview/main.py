@@ -7,7 +7,7 @@ ELEVATION_MIN = -18
 #point_cloud = np.loadtxt('data/hej.csv', delimiter=' ')
 #point_cloud = trim_to_roi(point_cloud,ROI)
 def main():
-    filaname700k = '/home/annaochjacob/Documents/MATLAB/ply_test/000017.csv'
+    filaname700k = '/home/annaochjacob/Documents/MATLAB/ply_test/pc_34.csv'
     #filename100k = '/home/annaochjacob/Documents/MATLAB/ply_test/000006.ply'
     point_cloud = np.loadtxt(filaname700k, delimiter=',', skiprows=1)
 

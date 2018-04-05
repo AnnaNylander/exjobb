@@ -1,5 +1,5 @@
 import numpy as np
-from preprocessing.depth_to_point_cloud import depth_to_point_cloud
+#from preprocessing.depth_to_point_cloud import depth_to_point_cloud
 from preprocessing.point_cloud_to_image import trim_to_roi
 import datetime
 
@@ -12,25 +12,42 @@ MEASUREMENTS_PRECISION = '%.8f'
 DELIMITER = ','
 COMMENTS = ''
 
-def save_point_cloud(frame, sensor_data, save_path):
+#def save_point_cloud(frame, sensor_data, save_path):
     # Read data from depth map sensors
-    head = sensor_data['CameraDepthHead'].data
-    tail = sensor_data['CameraDepthTail'].data
-    left = sensor_data['CameraDepthLeft'].data
-    right = sensor_data['CameraDepthRight'].data
+#    head = sensor_data['CameraDepthHead'].data
+#    tail = sensor_data['CameraDepthTail'].data
+#    left = sensor_data['CameraDepthLeft'].data
+#    right = sensor_data['CameraDepthRight'].data
 
     # Convert depth maps to 3D point cloud
-    point_cloud = depth_to_point_cloud(head, tail, left, right, \
-        FAR, interpolate=INTERPOLATE, threshold=THRESHOLD)
+#    point_cloud = depth_to_point_cloud(head, tail, left, right, \
+#        FAR, interpolate=INTERPOLATE, threshold=THRESHOLD)
 
     # Trim point cloud to only contain points within the region of interest
-    point_cloud = trim_to_roi(point_cloud,ROI)
+#    point_cloud = trim_to_roi(point_cloud,ROI)
 
     # Save point cloud for this frame
-    np.savetxt(save_path + "/pc_%i.csv" %frame, point_cloud, \
-        fmt=POINT_CLOUD_PRECISION, comments=COMMENTS, delimiter=DELIMITER)
+#    np.savetxt(save_path + "/pc_%i.csv" %frame, point_cloud, \
+#        fmt=POINT_CLOUD_PRECISION, comments=COMMENTS, delimiter=DELIMITER)
 
-    return point_cloud
+#    return point_cloud
+
+def save_point_cloud(frame, point_cloud, save_path):
+    filename = save_path + 'pc_%i.csv' %frame
+
+    pc = [[x,-y,-z] for [x,y,z] in point_cloud]
+
+    # format point cloud
+    pc = '\n'.join(['{:.2f},{:.2f},{:.2f}'
+                        .format(*p) for p in pc])
+
+    # Add header
+    pc = '\n'.join(['x,y,z', pc])
+
+    # Open the file and save point cloud in it
+    with open(filename, 'w+') as csv_file:
+        csv_file.write(pc)
+
 
 def save_player_measurements(measurements, save_path):
     # Save measurements of whole episode to one file
