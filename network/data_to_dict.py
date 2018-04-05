@@ -2,12 +2,12 @@ import os
 import re
 import numpy as np
 
-def getData(path,max):
+def getData(path,max=-1):
     print("Loading: " + path)
     path_topviews = path + 'input/topviews/max_elevation/'
     path_values = path + 'input/values/'
     path_output = path + 'output/'
-    if max > len(os.listdir(path_topviews)):
+    if max > len(os.listdir(path_topviews)) or max ==-1:
         max = len(os.listdir(path_topviews))
 
     dic = {}
@@ -15,7 +15,7 @@ def getData(path,max):
     indices = getIndices(path_topviews, max)
     dic['indices'] = indices
     print('\tLIDAR')
-    dic['lidar'] = [path+filename+'%i.csv' %i for i in indices]  #path for lidar picture
+    dic['lidar'] = [path+'input/topviews/max_elevation/me_%i.csv' %i for i in indices]  #path for lidar picture
     print('\tVALUES')
     dic['values'] = getArray(path_values, 30, 11, True, indices, 'input_')
     print('\tOUTPUT')

@@ -6,26 +6,26 @@ import shutil
 parser = argparse.ArgumentParser(description='Split data set in training, testing, and validation set')
 parser.add_argument('--train', metavar='ratio of dataset', type=float,
                     dest='ratio_train', default=0.7,
-                    help='Ratio of original data set to put in training set')
+                    help='Ratio of original data set to put in training set. (default 0.7)')
 parser.add_argument('--test', metavar='ratio of dataset',type=float,
                     dest='ratio_test', default=0.2,
-                    help='Ratio of original data set to put in training set')
-parser.add_argument('--save-path', metavar='path',
+                    help='Ratio of original data set to put in training set. (default 0.2)')
+parser.add_argument('-s','--save-path', metavar='path',
                     dest='save_path', default='dataset/',
                     help='Foldername in /media/annaochjacob/crucial/dataset/ ex \'banana_split/\' (with trailing /)')
-parser.add_argument('--data-path', metavar='path',
+parser.add_argument('-d','--data-path', metavar='path',
                     dest='data_path', default='recorded_data/',
                     help='Foldername in /media/annaochjacob/crucial/dataset/ ex \'banana/\' (with trailing /)')
-parser.add_argument('--copy', metavar='boolean',
-                    dest='copy', default=False,
+parser.add_argument('--copy', action='store_true',
+                    dest='copy',
                     help='Copy data instead of moving')
 
 args = parser.parse_args()
 
 PATH_BASE = '/media/annaochjacob/crucial/'
 
-SAVE_PATH =  PATH_BASE + 'dataset/' + Save_path
-DATA_PATH = PATH_BASE +'dataset/' +  Data_path
+SAVE_PATH =  PATH_BASE + 'dataset/' + args.save_path
+DATA_PATH = PATH_BASE +'dataset/' +  args.data_path
 
 def main():
     '''Splits a dataset into train, test and validate subsets. Train and test

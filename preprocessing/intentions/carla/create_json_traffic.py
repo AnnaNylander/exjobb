@@ -3,7 +3,8 @@ import json
 import argparse
 import math
 import numpy
-from preprocessing.intentions.carla.util import getEulerDistance, isWithinRadius
+import os
+from intentions.carla.util import getEulerDistance, isWithinRadius
 
 #parser = argparse.ArgumentParser(description='Create json file')
 #parser.add_argument('--path', metavar='PATH', dest='path',
@@ -29,10 +30,15 @@ def isVisible(a, b):
 
 
 def create_json(args):
-    DYNAMIC_PATH = args.data_path + 'dynamic_measurements/dm.csv'
-    STATIC_PATH = args.data_path + 'static_measurements/sm.csv'
-    CSVFILE_PATH = args.data_path + 'player_measurements/pm.csv'
-    JSON_PATH = args.data_path + 'traffic_awareness/traffic.json'
+    PATH_BASE = '/media/annaochjacob/crucial/recorded_data/carla/'
+
+    DYNAMIC_PATH = PATH_BASE + args.data_path + 'dynamic_measurements/dm.csv'
+    STATIC_PATH =  PATH_BASE + args.data_path + 'static_measurements/sm.csv'
+    CSVFILE_PATH =  PATH_BASE + args.data_path + 'player_measurements/pm.csv'
+    JSON_PATH =  PATH_BASE + args.data_path + 'traffic_awareness/traffic.json'
+    # Create directories
+    if not os.path.exists(PATH_BASE + args.data_path + 'traffic_awareness/'):
+        os.makedirs(PATH_BASE + args.data_path + 'traffic_awareness/')
 
     print("Reading car information from " + CSVFILE_PATH +\
             "\nReading static information from " + STATIC_PATH +\

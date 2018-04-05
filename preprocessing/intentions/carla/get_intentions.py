@@ -2,7 +2,7 @@ import csv
 import json
 import argparse
 import math
-from preprocessing.intentions.carla.util import getEulerDistance, isWithinRadius
+from intentions.carla.util import getEulerDistance, isWithinRadius
 
 RADIUS = 4
 

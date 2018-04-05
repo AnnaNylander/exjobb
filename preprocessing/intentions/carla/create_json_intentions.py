@@ -3,6 +3,7 @@ import json
 import argparse
 import math
 import numpy
+import os
 
 #parser = argparse.ArgumentParser(description='Create json file')
 #parser.add_argument('--path', metavar='PATH', dest='path',
@@ -11,9 +12,14 @@ import numpy
 #args = parser.parse_args()
 
 def create_json(args):
-    CSVFILE_PATH = args.data_path + 'player_measurements/pm.csv'
-    ANNOTATIONS_PATH = args.data_path + 'intentions/manual_annotations.csv'
-    JSON_PATH = args.data_path + 'intentions/intentions.json'
+    PATH_BASE = '/media/annaochjacob/crucial/recorded_data/carla/'
+
+    CSVFILE_PATH = PATH_BASE + args.data_path + 'player_measurements/pm.csv'
+    ANNOTATIONS_PATH =  PATH_BASE + args.data_path + 'intentions/manual_annotations.csv'
+    JSON_PATH =  PATH_BASE + args.data_path + 'intentions/intentions.json'
+    #create directory
+    if not os.path.exists(PATH_BASE + args.data_path + 'intentions/'):
+            os.makedirs(PATH_BASE + args.data_path + 'intentions/')
 
     csv_data = numpy.genfromtxt(CSVFILE_PATH, delimiter=',', names=True)
     annoreader = csv.DictReader(open(ANNOTATIONS_PATH), delimiter=' ')

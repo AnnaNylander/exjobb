@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy
+import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from torch.autograd import Variable
 import torch

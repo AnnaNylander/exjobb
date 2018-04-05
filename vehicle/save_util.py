@@ -12,26 +12,6 @@ MEASUREMENTS_PRECISION = '%.8f'
 DELIMITER = ','
 COMMENTS = ''
 
-#def save_point_cloud(frame, sensor_data, save_path):
-    # Read data from depth map sensors
-#    head = sensor_data['CameraDepthHead'].data
-#    tail = sensor_data['CameraDepthTail'].data
-#    left = sensor_data['CameraDepthLeft'].data
-#    right = sensor_data['CameraDepthRight'].data
-
-    # Convert depth maps to 3D point cloud
-#    point_cloud = depth_to_point_cloud(head, tail, left, right, \
-#        FAR, interpolate=INTERPOLATE, threshold=THRESHOLD)
-
-    # Trim point cloud to only contain points within the region of interest
-#    point_cloud = trim_to_roi(point_cloud,ROI)
-
-    # Save point cloud for this frame
-#    np.savetxt(save_path + "/pc_%i.csv" %frame, point_cloud, \
-#        fmt=POINT_CLOUD_PRECISION, comments=COMMENTS, delimiter=DELIMITER)
-
-#    return point_cloud
-
 def save_point_cloud(frame, point_cloud, save_path):
     filename = save_path + 'pc_%i.csv' %frame
 

@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import argparse
-from util import lidar_to_topview, get_max_elevation
+from util import trim_to_roi,lidar_to_topview, get_max_elevation
 import intentions.carla.create_intentions as create_intentions
 import time
 
@@ -18,14 +18,13 @@ args = parser.parse_args()
 ROI = 60
 CELLS = 600
 PATH_BASE = '/media/annaochjacob/crucial/'
- #TODO
-PATH_POINT_CLOUDS =  PATH_BASE + args.data_path + 'point_cloud/'
-PATH_PLAYER = PATH_BASE + args.data_path + 'player_measurements/'
-PATH_INTENTIONS = PATH_BASE + args.data_path + 'intentions/'
-PATH_TRAFFIC = PATH_BASE + args.data_path + 'traffic_awareness/'
+PATH_POINT_CLOUDS =  PATH_BASE + 'recorded_data/carla/' + args.data_path + 'point_cloud/'
+PATH_PLAYER = PATH_BASE +'recorded_data/carla/'+ args.data_path + 'player_measurements/'
+PATH_INTENTIONS = PATH_BASE +'recorded_data/carla/'+ args.data_path + 'intentions/'
+PATH_TRAFFIC = PATH_BASE +'recorded_data/carla/'+ args.data_path + 'traffic_awareness/'
 
-PATH_INPUT = PATH_BASE + args.save_path + 'input/'
-PATH_OUTPUT = PATH_BASE + args.save_path + 'output/'
+PATH_INPUT = PATH_BASE + 'dataset/'+ args.save_path + 'input/'
+PATH_OUTPUT = PATH_BASE + 'dataset/'+ args.save_path + 'output/'
 
 N_STEPS_FUTURE = 30
 N_STEPS_PAST = 30
@@ -42,7 +41,7 @@ def main():
     corresponds to time step (n+1+k).'''
 
     #First of all, create intentions and traffic awareness files.
-    create_intentions(args)
+    create_intentions.create_intentions(args)
 
     # Create directories
     if not os.path.exists(args.save_path):
@@ -85,8 +84,8 @@ def main():
         # TODO If we want, we can plot data input as an overlay on the topviews here
 
         filename = PATH_POINT_CLOUDS + 'pc_%i.csv' %frame
-        point_cloud = point_cloud = np.loadtxt(filename, delimiter=',')
-
+        point_cloud = np.genfromtxt(filename, delimiter=',', skip_header=True)
+        point_cloud = trim_to_roi(point_cloud, 60)
         # Save maximum elevation
         data_max_elevation = get_max_elevation(frame, point_cloud, ROI, CELLS)
         filename = (PATH_INPUT + 'topviews/max_elevation/me_%i.csv') %frame

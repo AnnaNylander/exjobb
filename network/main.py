@@ -19,24 +19,26 @@ from result_meter import ResultMeter
 # NOTE! Validate during traning. Test is last when model finished traning.
 
 parser = argparse.ArgumentParser(description='PyTorch Drive a car wohoo')
-parser.add_argument('--arch', default='', type=str, metavar='file.class()',
-                    help = 'Name of network to use. eg: LucaNetwork.LucaNet()')
+parser.add_argument('-a','--arch', default='', type=str, metavar='file.class',
+                    help = 'Name of network to use. eg: LucaNetwork.LucaNet')
 parser.add_argument('-b', '--batch-size', default=20, type=int,
                     metavar='N', help='mini-batch size (default: 20)')
 parser.add_argument('-e', '--epochs', default=10, type=int,
                     metavar='N', help='number of total epochs (default: 10)')
-parser.add_argument('--print-freq', '-p', default=100, type=int,
+parser.add_argument('-p','--print-freq', default=100, type=int,
                     metavar='N', help='print frequency (default: 100)')
-parser.add_argument('--plot-freq', '-pl', default=100, type=int,
+parser.add_argument('-pl', '--plot-freq', default=100, type=int,
                     metavar='N', dest='plot_freq', help='plot frequency (default: 100 batch)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
-                    help='Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/\' (with trailing /)')
+                    help='Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/checkpoint.pt\' ')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
-parser.add_argument('--dataset', dest='dataset_path', default='temp/',
-                    type=str, metavar='PATH', help = 'Name of folder in /media/annaochjacob/crucial/dataset/ ex \'Banana_split/\' (with trailing /)')
-parser.add_argument('--save-path', dest='save_path', default='temp/',
-                    type=str, metavar='PATH', help = 'Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/\' (with trailing /)')
+parser.add_argument('-d','--dataset', dest='dataset_path', default='temp/',
+                    type=str, metavar='PATH',
+                    help = 'Name of folder in /media/annaochjacob/crucial/dataset/ ex \'Banana_split/\' (with trailing /)')
+parser.add_argument('-s','--save-path', dest='save_path', default='temp/',
+                    type=str, metavar='PATH',
+                    help = 'Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/\' (with trailing /)')
 
 args = parser.parse_args()
 
@@ -54,7 +56,6 @@ def main():
     train_losses = ResultMeter()
     validation_losses = ResultMeter()
     times = ResultMeter()
-    arch = args.arch
 
     # load all time best
     print("-----Load all time best loss (for comparision)-----")
@@ -68,7 +69,7 @@ def main():
     # create new model and lossfunctions and stuff
     if not args.resume:
         print("-----Creating network-----")
-        model = eval(arch)
+        model = eval(args.arch + "()")
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
 
@@ -81,14 +82,14 @@ def main():
     #resume from checkpoint
     if args.resume:
         print("----Resume from checkpoint:-----")
-        checkpoint = load_checkpoint(args.resume)
+        checkpoint = load_checkpoint(PATH_RESUME)
         if checkpoint is None:
             print("No file found. Exiting...")
             return
         # model
         print("\t Creating network")
-        arch = checkpoint['arch']
-        model = eval(arch)
+        args.arch = checkpoint['arch']
+        model = eval(args.arch + "()")
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
         # loss function and optimizer
@@ -114,14 +115,14 @@ def main():
     print("-----Loading datasets-----")
     # TODO if evaluate flag is true, don't load all the datasets.
     if not args.evaluate:
-        validate_dataset = OurDataset(getData(PATH_DATA + 'validate/', 1000)) #2000
-        train_dataset = OurDataset(getData(PATH_DATA + 'train/', 7000)) #14000
+        validate_dataset = OurDataset(getData(PATH_DATA + 'validate/')) #2000
+        train_dataset = OurDataset(getData(PATH_DATA + 'train/')) #14000
         dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
                         shuffle=True, num_workers=4, pin_memory=False)
         dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
                         shuffle=False, num_workers=4, pin_memory=False)
 
-    test_dataset = OurDataset(getData(PATH_DATA + 'test/', 3000)) #4000
+    test_dataset = OurDataset(getData(PATH_DATA + 'test/')) #4000
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=4, pin_memory=False)
 
@@ -190,7 +191,7 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
 
         # Save checkpoint
         save_checkpoint({
-            'arch' : arch
+            'arch' : args.arch,
             'epoch': epoch + 1,
             'step' : step + 1,
             'state_dict': model.state_dict(),

@@ -4,9 +4,9 @@ import os
 import re
 import matplotlib.pyplot as plt
 import argparse
-from lidar_to_topview.main import lidar_to_topview, get_max_elevation
+from preprocessing.util import lidar_to_topview, get_max_elevation,trim_to_roi
 
-parser = argparse.ArgumentParser(description='Show (and/or save) a topview with past, predicted, and future ground-truth path.')
+parser = argparse.ArgumentParser(description='Save a topview/plot with past, predicted, and future ground-truth path.')
 parser.add_argument('--step', metavar='N', type=int,
                     dest='timeStep', default=None,
                     help='Time step (frame index) to plot. (default all)')
@@ -21,7 +21,7 @@ parser.add_argument('-s','--save-path', metavar='path',
 
 parser.add_argument('-d','--dataset', metavar='path',
                     dest='dataset',
-                    help='Foldername of dataset. Eg. Banan_split/ (with trailing /)')
+                    help='Foldername of dataset. Eg. Banan_split/test/ (with trailing /)')
 parser.add_argument('-r','--recorded_data', metavar='path',
                     dest='recorded',
                     help='Foldername of recorded data. Eg. recorded_2018_03_14/ (with trailing /)')
@@ -34,9 +34,9 @@ ROI = 60
 CELLS = 600
 SIDE = 60
 PATH_BASE = '/media/annaochjacob/crucial/'
-PATH_DATA = PATH_BASE + args.dataset
-PATH_POINT_CLOUD = PATH_BASE + args.recorded + 'point_cloud/'
-PATH_PREDICTION = PATH_BASE + args.saved_models + 'generated_output/'
+PATH_DATA = PATH_BASE +'dataset/'+ args.dataset
+PATH_POINT_CLOUD = PATH_BASE +'recorded_data/carla/'+ args.recorded + 'point_cloud/'
+PATH_PREDICTION = PATH_BASE +'models/'+ args.saved_models + 'generated_output/'
 SAVE_PATH = args.save_path
 SUBPLOT_ROWS = 1
 SUBPLOT_COLS = 1
@@ -90,7 +90,8 @@ def visualize(step, path, prediction, everything):
 
     # Read point cloud and generate top view image
     filename = PATH_POINT_CLOUD + 'pc_%i.csv' % step
-    point_cloud = np.genfromtxt(filename, delimiter=',')
+    point_cloud = np.genfromtxt(filename, delimiter=',', skip_header=True)
+    point_cloud = trim_to_roi(point_cloud, ROI)
     topview_img = lidar_to_topview(point_cloud, ROI, CELLS)
     topview_img = topview_img.squeeze()
 

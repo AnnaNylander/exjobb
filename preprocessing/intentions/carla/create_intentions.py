@@ -4,9 +4,9 @@ import argparse
 import math
 import numpy
 
-from preprocessing.intentions.carla.get_intentions import getData, getDataTraffic
-from preprocessing.intentions.carla.create_json_intentions import create_json as intentions_json
-from preprocessing.intentions.carla.create_json_traffic import create_json as traffic_json
+from intentions.carla.get_intentions import getData, getDataTraffic
+from intentions.carla.create_json_intentions import create_json as intentions_json
+from intentions.carla.create_json_traffic import create_json as traffic_json
 
 
 #parser = argparse.ArgumentParser(description='Calculate intentions')
@@ -20,12 +20,13 @@ def create_intentions(args):
     Then write the intentions to a new csv file. Also writing traffic intentions."""
 
     # create paths.
-    DYNAMIC_PATH = args.data_path + 'dynamic_measurements/dm.csv'
-    CSVFILE_PATH = args.data_path + 'player_measurements/pm.csv'
-    JSON_INTENTIONS = args.data_path + 'intentions/intentions.json'
-    JSON_TRAFFIC = args.data_path + 'traffic_awareness/traffic.json'
-    TARGET_TRAFFIC_PATH = args.data_path + 'traffic_awareness/traffic.csv'
-    TARGET_INTENTIONS_PATH = args.data_path + 'intentions/intentions.csv'
+    PATH_BASE = '/media/annaochjacob/crucial/recorded_data/carla/'
+    DYNAMIC_PATH = PATH_BASE + args.data_path + 'dynamic_measurements/dm.csv'
+    CSVFILE_PATH =  PATH_BASE + args.data_path + 'player_measurements/pm.csv'
+    JSON_INTENTIONS =  PATH_BASE + args.data_path + 'intentions/intentions.json'
+    JSON_TRAFFIC =  PATH_BASE + args.data_path + 'traffic_awareness/traffic.json'
+    TARGET_TRAFFIC_PATH =  PATH_BASE + args.data_path + 'traffic_awareness/traffic.csv'
+    TARGET_INTENTIONS_PATH =  PATH_BASE + args.data_path + 'intentions/intentions.csv'
 
 
     print("****** Creating json files ******")

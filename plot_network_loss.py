@@ -3,17 +3,14 @@ import matplotlib.pyplot as plt
 import argparse
 
 parser = argparse.ArgumentParser(description='Plot training progress')
-parser.add_argument('--path', metavar='folder', type=str,
+parser.add_argument('-m','--model', metavar='folder', type=str,
                     dest='path', default='',
-                    help='Foldername in /media/annaochjacob/crucial/models where the loss files are stored. Eg. \'LucaNet/\' (with trailing /)')
-parser.add_argument('--avg', metavar='N', type=int,
-                    dest='avg', default=20,
-                    help='Moving average windows size')
+                    help='Foldername to model where the loss files are stored. Eg. \'LucaNet/\' (with trailing /)')
 parser.add_argument('--ylim', metavar='N', type=int,
-			dest='ylim', default=10, help='Y-axis positive limit')
+			        dest='ylim', default=10, help='Y-axis positive limit')
 
 args = parser.parse_args()
-PATH = '/media/annaochjacob/crucial/models/' + args.path
+PATH_BASE = '/media/annaochjacob/crucial/models/'
 
 def moving_average(a, n=100) :
     ret = np.cumsum(a, dtype=float)
@@ -21,8 +18,8 @@ def moving_average(a, n=100) :
     return ret[n - 1:] / n
 
 def main():
-    PATH_TRAIN = args.path + 'train_losses.csv'
-    PATH_VALIDATE = args.path + 'validation_losses.csv'
+    PATH_TRAIN = PATH_BASE +  args.path + 'train_losses.csv'
+    PATH_VALIDATE = PATH_BASE + args.path + 'validation_losses.csv'
     train = np.loadtxt(PATH_TRAIN, delimiter=',')
     validate = np.loadtxt(PATH_VALIDATE, delimiter=',')
 
