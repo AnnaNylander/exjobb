@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import argparse
 from lidar_to_topview.main import lidar_to_topview, get_max_elevation
 
-parser = argparse.ArgumentParser(description='TODO Description hehe')
+parser = argparse.ArgumentParser(description='Show (and/or save) a topview with past, predicted, and future ground-truth path.')
 parser.add_argument('--step', metavar='N', type=int,
                     dest='timeStep', default=None,
                     help='Time step (frame index) to plot. (default all)')
@@ -15,27 +15,28 @@ parser.add_argument('--prediction', dest='prediction', action='store_true',
 parser.add_argument('--everything', dest='everything', action='store_true',
                     help='Whether to plot all graphs or not.')
 
-parser.add_argument('--save-path', metavar='path',
+parser.add_argument('-s','--save-path', metavar='path',
                     dest='save_path',
-                    help='Where to save the images')
+                    help='Where to save the images. THE FULL PATH.')
 
-parser.add_argument('--dataset', metavar='path',
+parser.add_argument('-d','--dataset', metavar='path',
                     dest='dataset',
-                    help='path to dataset folder')
-parser.add_argument('--recorded_data', metavar='path',
+                    help='Foldername of dataset. Eg. Banan_split/ (with trailing /)')
+parser.add_argument('-r','--recorded_data', metavar='path',
                     dest='recorded',
-                    help='path to recorded data folder')
-parser.add_argument('--saved_models', metavar='path',
+                    help='Foldername of recorded data. Eg. recorded_2018_03_14/ (with trailing /)')
+parser.add_argument('-m','--models', metavar='path',
                     dest='saved_models',
-                    help='path to folder of saved models')
+                    help='Foldername of model. Eg. LucaNet/ (with trailing /)')
 args = parser.parse_args()
 
 ROI = 60
 CELLS = 600
 SIDE = 60
-PATH_DATA = args.dataset
-PATH_POINT_CLOUD = args.recorded + 'point_cloud/'
-PATH_PREDICTION = args.saved_models + 'generated_output/'
+PATH_BASE = '/media/annaochjacob/crucial/'
+PATH_DATA = PATH_BASE + args.dataset
+PATH_POINT_CLOUD = PATH_BASE + args.recorded + 'point_cloud/'
+PATH_PREDICTION = PATH_BASE + args.saved_models + 'generated_output/'
 SAVE_PATH = args.save_path
 SUBPLOT_ROWS = 1
 SUBPLOT_COLS = 1
@@ -48,6 +49,7 @@ def main():
     # else save all in folder.
     else:
         indices = getIndices(PATH_DATA)
+        indices = sorted(indices)
         for i in indices:
             visualize(i, SAVE_PATH, args.prediction, args.everything)
             print(i)

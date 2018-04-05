@@ -4,13 +4,14 @@ import numpy as np
 from PIL import Image
 import argparse
 
-parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
+parser = argparse.ArgumentParser(description='Create video from png pictures. RUN IN PYTHON 3.5!! ')
 parser.add_argument('--path', metavar='path',
-                    dest='path', default='/media/annaochjacob/crucial/datasets/test_set1/images/',
-                    help='Path to folder where images is stored.')
-
+                    dest='path', default='',
+                    help='Path to folder where images is stored. The WHOLE path is needed.')
+parser.add_argument('--filename', metavar='name', dest='name', default='img_',
+                    help='Prefix of name (before the number). Eg. \'img_\' in \'img_1.png\'. (default \'img_\')')
+                    
 args = parser.parse_args()
-
 
 image_folder = args.path
 

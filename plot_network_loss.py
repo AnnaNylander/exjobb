@@ -3,17 +3,17 @@ import matplotlib.pyplot as plt
 import argparse
 
 parser = argparse.ArgumentParser(description='Plot training progress')
-parser.add_argument('--path', metavar='PATH', type=str,
-                    dest='path', default='/saved/',
-                    help='Path to folder with saved losses')
+parser.add_argument('--path', metavar='folder', type=str,
+                    dest='path', default='',
+                    help='Foldername in /media/annaochjacob/crucial/models where the loss files are stored. Eg. \'LucaNet/\' (with trailing /)')
 parser.add_argument('--avg', metavar='N', type=int,
                     dest='avg', default=20,
                     help='Moving average windows size')
-
 parser.add_argument('--ylim', metavar='N', type=int,
 			dest='ylim', default=10, help='Y-axis positive limit')
 
 args = parser.parse_args()
+PATH = '/media/annaochjacob/crucial/models/' + args.path
 
 def moving_average(a, n=100) :
     ret = np.cumsum(a, dtype=float)
