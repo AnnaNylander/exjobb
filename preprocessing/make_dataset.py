@@ -23,8 +23,9 @@ PATH_PLAYER = PATH_BASE +'recorded_data/carla/'+ args.data_path + 'player_measur
 PATH_INTENTIONS = PATH_BASE +'recorded_data/carla/'+ args.data_path + 'intentions/'
 PATH_TRAFFIC = PATH_BASE +'recorded_data/carla/'+ args.data_path + 'traffic_awareness/'
 
-PATH_INPUT = PATH_BASE + 'dataset/'+ args.save_path + 'input/'
-PATH_OUTPUT = PATH_BASE + 'dataset/'+ args.save_path + 'output/'
+PATH_SAVE = PATH_BASE + 'dataset/'+ args.save_path
+PATH_INPUT = PATH_SAVE + 'input/'
+PATH_OUTPUT =  PATH_SAVE + 'output/'
 
 N_STEPS_FUTURE = 30
 N_STEPS_PAST = 30
@@ -44,8 +45,8 @@ def main():
     create_intentions.create_intentions(args)
 
     # Create directories
-    if not os.path.exists(args.save_path):
-        os.makedirs(args.save_path)
+    if not os.path.exists(PATH_SAVE):
+        os.makedirs(PATH_SAVE)
     if not os.path.exists(PATH_INPUT):
         os.makedirs(PATH_INPUT)
     if not os.path.exists(PATH_INPUT + "values/"):

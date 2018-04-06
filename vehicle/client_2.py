@@ -106,6 +106,7 @@ SAVE_PATH_PREDICTIONS = SAVE_PATH_SESSION + 'generated_output/'
 SAVE_PATH_POINT_CLOUD = SAVE_PATH_SESSION + 'point_cloud/'
 SAVE_PATH_RGB_IMG = SAVE_PATH_SESSION + 'rgb_images/'
 ANNOTATIONS_PATH = '/media/annaochjacob/crucial/annotations/path_2018_03_27/'
+
 N_PAST_STEPS = 30
 MOVING_AVERAGE_LENGTH = 10
 STEERING_MAX = 70 # angle in degrees
@@ -150,10 +151,10 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             settings.add_sensor(camera0)
 
             # Let's add another camera producing ground-truth depth.
-            camera1 = Camera('CameraDepth', PostProcessing='Depth')
-            camera1.set_image_size(800, 600)
-            camera1.set_position(30, 0, 130)
-            settings.add_sensor(camera1)
+            #camera1 = Camera('CameraDepth', PostProcessing='Depth')
+            #camera1.set_image_size(800, 600)
+            #camera1.set_position(30, 0, 130)
+            #settings.add_sensor(camera1)
 
         else:
 
@@ -169,7 +170,7 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
         # Choose one player start at random.
         number_of_player_starts = len(scene.player_start_spots)
         player_start = random.randint(0, max(0, number_of_player_starts - 1))
-        #player_start = 56
+        #player_start = 30
 
         # Create meta document
         saver.save_info(SAVE_PATH_SESSION, scene, args)
@@ -204,6 +205,8 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
             prev_intentions = np.zeros([N_PAST_STEPS + 1, 2]) #direction, distance
             prev_traffic = np.zeros([N_PAST_STEPS + 1, 4]) #distance, current_limit, next_limit, light_status
 
+        left_turn_count = 0 #used for 'manual' annotations
+        right_turn_count = 0
         # Iterate every frame in the episode.
         for frame in range(0,args.frames):
             # Time processing of each frame to estimate episode duration
@@ -370,7 +373,13 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
                 # server. We can modify it if wanted, here for instance we
                 # will add some noise to the steer.
                 control = measurements.player_measurements.autopilot_control
-                control.steer += random.uniform(-0.05, 0.05)
+
+                #print(control.steer)
+                velocity = pm[8]
+                if velocity >= 60:
+                    control.steer += random.uniform(-0.05, 0.05)
+                else:
+                    control.steer += random.uniform(-0.1, 0.1)
                 client.send_control(control)
             else:
                 client.send_control(
@@ -394,7 +403,6 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
         saver.save_player_measurements(player_values, SAVE_PATH_PLAYER)
         saver.save_dynamic_measurements(header_dynamic, dynamic_values,
             SAVE_PATH_DYNAMIC)
-
         episode_end = datetime.datetime.now()
         episode_time = episode_end - episode_start
         print("Episode ended %s, duration %s"
@@ -426,8 +434,8 @@ def print_measurements(measurements):
     message += '{other_lane:.0f}% other lane, {offroad:.0f}% off-road, '
     message += '({agents_num:d} non-player agents in the scene)'
     message = message.format(
-        pos_x=player_measurements.transform.location.x / 100, # cm -> m
-        pos_y=player_measurements.transform.location.y / 100,
+        pos_x=player_measurements.transform.location.x,
+        pos_y=player_measurements.transform.location.y,
         speed=player_measurements.forward_speed,
         col_cars=player_measurements.collision_vehicles,
         col_ped=player_measurements.collision_pedestrians,
