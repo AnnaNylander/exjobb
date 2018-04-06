@@ -10,9 +10,10 @@
 If you instead want to run the source server (must already be manually compiled), go to
 `cd ~/Repos/carla/Unreal/CarlaUE4/LinuxNoEditor`
 4. To start the server, run
-`./CarlaUE4.sh /Game/Maps/Town01 -carla-server -benchmark -fps=10 -windowed -ResX=400 -ResY=300 --carla-settings="/path_to_carla_repo/PythonClient/CarlaSettings.ini"`
+`./CarlaUE4.sh /Game/Maps/Town01 -carla-server -benchmark -fps=10 -windowed -ResX=400 -ResY=300`
 6. To start the client go to PythonClient folder and run
-`python3 client_1.py --frames=100 --save-path="/where/to/save/recorded/data" --carla-settings="/path_to_carla_repo/PythonClient/CarlaSettings.ini" --images-to-disk --autopilot`
+`python3 client_2.py --frames=100 --save-path="/where/to/save/recorded/data" --carla-settings="/path_to_carla_repo/PythonClient/CarlaSettings.ini" --images-to-disk --autopilot -n='name_of_recording'`
+7. You can edit and run `bash record.sh` in the exjobb repo to record consecutive sessions.
 
 # How to create data set
 1. First we need to create the intentions and traffic awareness csv files.
