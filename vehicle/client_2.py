@@ -168,11 +168,11 @@ def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk
         scene = client.load_settings(settings)
         # Choose one player start at random.
         number_of_player_starts = len(scene.player_start_spots)
-        player_start = 56
-        #player_start = random.randint(0, max(0, number_of_player_starts - 1))
+        player_start = random.randint(0, max(0, number_of_player_starts - 1))
+        #player_start = 56
 
         # Create meta document
-        saver.save_info(SAVE_PATH_SESSION, settings, args)
+        saver.save_info(SAVE_PATH_SESSION, scene, args)
 
         # Notify the server that we want to start the episode at the
         # player_start index. This function blocks until the server is ready

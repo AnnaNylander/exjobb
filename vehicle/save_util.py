@@ -1,12 +1,9 @@
 import numpy as np
-#from preprocessing.depth_to_point_cloud import depth_to_point_cloud
 from preprocessing.point_cloud_to_image import trim_to_roi
 import datetime
 
 ROI = 60        # Region of interest side length, in meters.
 FAR = 1000      # Far plane distance
-THRESHOLD = 1.5 # Do not interpolate if difference between pixels is larger than this
-INTERPOLATE = True
 POINT_CLOUD_PRECISION = '%.3f'
 MEASUREMENTS_PRECISION = '%.8f'
 DELIMITER = ','
@@ -15,6 +12,7 @@ COMMENTS = ''
 def save_point_cloud(frame, point_cloud, save_path):
     filename = save_path + 'pc_%i.csv' %frame
 
+    # Reverse y and z because of carla
     pc = [[x,-y,-z] for [x,y,z] in point_cloud]
 
     # format point cloud
@@ -27,7 +25,6 @@ def save_point_cloud(frame, point_cloud, save_path):
     # Open the file and save point cloud in it
     with open(filename, 'w+') as csv_file:
         csv_file.write(pc)
-
 
 def save_player_measurements(measurements, save_path):
     # Save measurements of whole episode to one file
@@ -50,9 +47,9 @@ def get_player_measurements(measurements):
     player_values[1] = measurements.game_timestamp
 
     # Location
-    player_values[2] = transform.location.x / 100 #  (cm -> m )
-    player_values[3] = transform.location.y / 100
-    player_values[4] = transform.location.z / 100
+    player_values[2] = transform.location.x
+    player_values[3] = transform.location.y
+    player_values[4] = transform.location.z
 
     # Acceleration and forward speed
     player_values[5] = acceleration.x
@@ -162,9 +159,9 @@ def get_static_measurements(measurements):
 
         values = {}
         values['type'] = agent_type
-        values['location_x'] = agent.transform.location.x / 100 #  (cm -> m )
-        values['location_y'] = agent.transform.location.y / 100 #  (cm -> m )
-        values['location_z'] = agent.transform.location.z / 100 #  (cm -> m )
+        values['location_x'] = agent.transform.location.x
+        values['location_y'] = agent.transform.location.y
+        values['location_z'] = agent.transform.location.z
         values['orientation_x'] = agent.transform.orientation.x
         values['orientation_y'] = agent.transform.orientation.y
         values['yaw'] = agent.transform.rotation.yaw
@@ -219,6 +216,7 @@ def save_info(save_path, settings, args):
     now = datetime.datetime.now()
     now.strftime("%Y-%m-%d-%H-%M-%S")
     filename = save_path + 'info.txt'
+
     with open(filename, 'w+') as info_file:
         info = [
             'Session name: %s' % args.session_name,
@@ -227,13 +225,5 @@ def save_info(save_path, settings, args):
             'Frames: %i' % args.frames,
             'Autopilot: %s' % str(args.autopilot),
             'Planner: %s' % args.planner_path
-
-            # TODO Get these to work...
-            #'SynchronousMode: %s' % str(settings.SynchronousMode),
-            #'NumberOfVehicles: %i' % settings.NumberOfVehicles
-            #'NumberOfPedestrians: %i' % settings.NumberOfVehicles,
-            #'WeatherId: %i' % settings.WeatherId,
-            #'SeedVehicles: %i' % settings.SeedVehicles,
-            #'SeedPedestrians: %i' % settings.SeedPedestrians
             ]
         info_file.write('\n'.join(info))
