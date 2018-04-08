@@ -16,8 +16,7 @@ def save_point_cloud(frame, point_cloud, save_path):
     pc = [[x,-y,-z] for [x,y,z] in point_cloud]
 
     # format point cloud
-    pc = '\n'.join(['{:.2f},{:.2f},{:.2f}'
-                        .format(*p) for p in pc])
+    pc = '\n'.join(['{:.2f},{:.2f},{:.2f}'.format(*p) for p in pc])
 
     # Add header
     pc = '\n'.join(['x,y,z', pc])

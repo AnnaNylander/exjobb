@@ -31,7 +31,7 @@ def run_carla_client(args):
     frames_per_episode = 50*10
 
     with make_carla_client(args.host, args.port) as client:
-        print('CarlaClient connected')
+        print('client connected')
 
         throttle = 0.0
 
@@ -49,27 +49,15 @@ def run_carla_client(args):
                 QualityLevel=args.quality_level)
             settings.randomize_seeds()
 
-            # The default camera captures RGB images of the scene.
             camera0 = Camera('CameraRGB')
-            # Set image resolution in pixels.
             camera0.set_image_size(800, 600)
-            # Set its position relative to the car in meters.
             camera0.set_position(0.30, 0, 1.30)
             settings.add_sensor(camera0)
 
-            # Now we load these settings into the server. The server replies
-            # with a scene description containing the available start spots for
-            # the player. Here we can provide a CarlaSettings object or a
-            # CarlaSettings.ini file as string.
             scene = client.load_settings(settings)
-
-            # Choose one player start at random.
             number_of_player_starts = len(scene.player_start_spots)
             player_start = 2 #random.randint(0, max(0, number_of_player_starts - 1))
 
-            # Notify the server that we want to start the episode at the
-            # player_start index. This function blocks until the server is ready
-            # to start the episode.
             print('Starting new episode...')
             client.start_episode(player_start)
 
@@ -138,39 +126,18 @@ def get_values(measurements):
 
 def main():
     argparser = argparse.ArgumentParser(description=__doc__)
-    argparser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        dest='debug',
-        help='print debug information')
-    argparser.add_argument(
-        '--host',
-        metavar='H',
-        default='localhost',
-        help='IP of the host server (default: localhost)')
-    argparser.add_argument(
-        '-p', '--port',
-        metavar='P',
-        default=2000,
-        type=int,
-        help='TCP port to listen to (default: 2000)')
-    argparser.add_argument(
-        '-q', '--quality-level',
-        choices=['Low', 'Epic'],
-        type=lambda s: s.title(),
-        default='Epic',
-        help='graphics quality level, a lower level makes the simulation run considerably faster.')
-    argparser.add_argument(
-        '-i', '--images-to-disk',
-        action='store_true',
-        dest='save_images_to_disk',
-        help='save images (and Lidar data if active) to disk')
-    argparser.add_argument(
-        '-c', '--carla-settings',
-        metavar='PATH',
-        dest='settings_filepath',
-        default=None,
-        help='Path to a "CarlaSettings.ini" file')
+    argparser.add_argument('-v', '--verbose',action='store_true',dest='debug',
+                            help='print debug information')
+    argparser.add_argument('--host',metavar='H',default='localhost',
+                            help='IP of the host server (default: localhost)')
+    argparser.add_argument('-p', '--port',metavar='P',default=2000,type=int,
+                            help='TCP port to listen to (default: 2000)')
+    argparser.add_argument('-q', '--quality-level',choices=['Low', 'Epic'],type=lambda s: s.title(),default='Epic',
+                            help='graphics quality level, a lower level makes the simulation run considerably faster.')
+    argparser.add_argument('-i', '--images-to-disk',action='store_true',dest='save_images_to_disk',
+                            help='save images (and Lidar data if active) to disk')
+    argparser.add_argument('-c', '--carla-settings',metavar='PATH',dest='settings_filepath',default=None,
+                            help='Path to a "CarlaSettings.ini" file')
 
     args = argparser.parse_args()
 
@@ -183,9 +150,7 @@ def main():
 
     while True:
         try:
-
             run_carla_client(args)
-
             print('Done.')
             return
 
