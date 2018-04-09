@@ -30,11 +30,12 @@ def create_json(args):
     data = dict()
     values = dict()
     for row in annoreader:
-        time = row['time']
-        time = time.split(":")
-        frame = int (time[0])*60*60*10
-        frame = frame + int (time[1])*60*10
-        frame = frame + int (time[2])*10
+        #time = row['time']
+        #time = time.split(":")
+        #frame = int (time[0])*60*60*10
+        #frame = frame + int (time[1])*60*10
+        #frame = frame + int (time[2])*10
+        frame = int(row['time']) #this row used for frames and not time
         direction = row['type']
         values[frame] = direction
 
