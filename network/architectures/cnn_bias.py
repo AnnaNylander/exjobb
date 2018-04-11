@@ -65,12 +65,10 @@ class CNNBiasFirst(nn.Module):
 
         # encoder
         b = F.elu(self.bias_e0(v))                              # [2, 8]
-        b = expand_biases(b, 600, 600)                          # [8, 600, 600]
-        print(type(b))
+        b = expand_biases(b,600,600)
 
-        # TODO What really happens when we create a new Variable each forward?
         l = self.conv_e0(l)                                     # [2, 8, 600, 600]
-        l = F.elu(torch.add(l, 1, Variable(b)))                 # [2, 8, 600, 600]
+        l = F.elu(torch.add(l, 1, b))                           # [2, 8, 600, 600]
 
         l = F.elu(self.conv_e1(l))                              # [2, 8, 600, 600]
         l = self.maxpool_e1(l)                                  # [2, 8, 300, 300]
@@ -373,11 +371,16 @@ class CNNBiasAll(nn.Module):
 
         return y
 
-def expand_biases(values, w, h):
+#def expand_biases(values, w, h):
     # Create one h by w matrix filled with v[i]'s for each channel i
-    expanded = [torch.ones((h, w))*v for v in values[0].data]
-    expanded = torch.stack(expanded)
-    return expanded
+#    expanded = [torch.ones((h, w))*v for v in values[0].data]
+#    expanded = torch.stack(expanded)
+#    return expanded
+
+def expand_biases(v, w, h):
+    b = v.size(0) # batch size
+    c = v.size(1) # number of channels
+    return v.unsqueeze(2).expand(b,c,h).unsqueeze(3).expand(b,c,h,w)
 
 def print_size(tensor, cond):
     if cond:
