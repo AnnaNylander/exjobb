@@ -7,7 +7,7 @@ parser.add_argument('-m','--model', metavar='folder', type=str,
                     dest='path', default='',
                     help='Foldername to model where the loss files are stored. Eg. \'LucaNet/\' (with trailing /)')
 parser.add_argument('--ylim', metavar='N', type=int,
-			        dest='ylim', default=10, help='Y-axis positive limit')
+			        dest='ylim', default=100, help='Y-axis positive limit')
 
 args = parser.parse_args()
 PATH_BASE = '/media/annaochjacob/crucial/models/'
@@ -29,16 +29,12 @@ def main():
     train_values = train[:,1]
     validate_values = validate[:,1]
 
-    #print(len(train[:,0]))
-    #print(len(train_values))
-
     train_handle = plt.plot(train[:,0], train_values, label="Training loss")
     validate_handle = plt.plot(validate[:,0], validate_values, label="Validation loss")
 
     axes = plt.gca()
     axes.set_xlim([0,np.max(train[:,0])])
     axes.set_ylim([0,args.ylim])
-
     plt.show()
 
 if __name__ == "__main__":

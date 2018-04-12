@@ -33,10 +33,10 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/checkpoint.pt\' ')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
-parser.add_argument('-d','--dataset', dest='dataset_path', default='temp/',
+parser.add_argument('-d','--dataset', dest='dataset_path', default='',
                     type=str, metavar='PATH',
                     help = 'Name of folder in /media/annaochjacob/crucial/dataset/ ex \'Banana_split/\' (with trailing /)')
-parser.add_argument('-s','--save-path', dest='save_path', default='temp/',
+parser.add_argument('-s','--save-path', dest='save_path', default='',
                     type=str, metavar='PATH',
                     help = 'Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/\' (with trailing /)')
 
@@ -46,6 +46,9 @@ PATH_BASE = '/media/annaochjacob/crucial/'
 PATH_RESUME = PATH_BASE + 'models/' + args.resume
 PATH_SAVE = PATH_BASE + 'models/' + args.save_path
 PATH_DATA = PATH_BASE + 'dataset/' + args.dataset_path
+
+NUM_WORKERS = 3
+PIN_MEM = False
 
 def main():
     # variables
@@ -113,18 +116,44 @@ def main():
 
     # Load datasets
     print("-----Loading datasets-----")
-    # TODO if evaluate flag is true, don't load all the datasets.
+    super_validate = {'indices': [], 'lidar': []}
+    super_train = {'indices': [], 'lidar': []}
+    super_test = {'indices': [], 'lidar': []}
     if not args.evaluate:
-        validate_dataset = OurDataset(getData(PATH_DATA + 'validate/')) #2000
-        train_dataset = OurDataset(getData(PATH_DATA + 'train/')) #14000
-        dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
-                        shuffle=True, num_workers=4, pin_memory=False)
-        dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
-                        shuffle=False, num_workers=4, pin_memory=False)
+        # Create a dictionary containing paths to data in all smaller data sets
+        for subdir in os.listdir(PATH_DATA):
+            subpath = PATH_DATA + subdir + '/'
+            validation_data = getData(subpath + 'validate/', max = 300)
+            train_data = getData(subpath + 'train/')
+            for key in list(validation_data.keys()):
+                if key in super_validate:
+                    super_validate[key] = numpy.concatenate((super_validate[key],validation_data[key]), axis=0)
+                    super_train[key] = numpy.concatenate((super_train[key], train_data[key]), axis=0)
+                else:
+                    super_validate[key] = validation_data[key]
+                    super_train[key] = train_data[key]
+            #super_validate.update(getData(subpath + 'validate/'))
+            #super_train.update(getData(subpath + 'train/'))
 
-    test_dataset = OurDataset(getData(PATH_DATA + 'test/')) #4000
+        validate_dataset = OurDataset(super_validate) #2000
+        train_dataset = OurDataset(super_train) #14000
+        dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
+                        shuffle=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
+        dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
+                        shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
+
+    for subdir in os.listdir(PATH_DATA):
+        subpath = PATH_DATA + subdir + '/'
+        test_data = getData(subpath + 'test/', max=10)
+        for key in list(test_data.keys()):
+            if key in super_test:
+                super_test[key] = numpy.concatenate((super_test[key], test_data[key]), axis=0)
+            else:
+                super_test[key] = test_data[key]
+
+    test_dataset = OurDataset(super_test) #4000
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
-                    shuffle=False, num_workers=4, pin_memory=False)
+                    shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
 
     # Train network
     if not args.evaluate:
@@ -159,20 +188,35 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
             train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
             times.update(epoch + 1, i + 1, step, time.time() - start_time)
-
             # Print statistics
             if step % args.print_freq == 0:
                 print_statistics(train_losses, times, len(dataloader_train))
-
             # Evaluate on validation set and save checkpoint
             if step % args.plot_freq == 0:
-
                 validation_loss = validate(model, dataloader_val, loss_fn)
                 validation_losses.update(epoch + 1, i + 1, step, validation_loss)
-
                 # Save losses to csv for plotting
                 save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
                 save_statistic(validation_losses, PATH_SAVE + 'validation_losses.csv')
+
+                # Store best loss value
+                is_best = validation_loss < best_res
+                best_res = min(validation_loss, best_res)
+                is_all_time_best = validation_loss < all_time_best_res
+                all_time_best_res = min(validation_loss, all_time_best_res)
+
+                # Save checkpoint
+                save_checkpoint({
+                    'arch' : args.arch,
+                    'epoch': epoch + 1,
+                    'step' : step + 1,
+                    'state_dict': model.state_dict(),
+                    'best_res': best_res,
+                    'optimizer' : optimizer.state_dict(),
+                    'train_losses' : train_losses.serialize(),
+                    'validation_losses' : validation_losses.serialize(),
+                    'times' : times.serialize()
+                }, is_best, is_all_time_best)
 
             step += 1
             #end of dataloader loop
@@ -262,6 +306,12 @@ def validate(model, dataloader, loss_fn, save_output=False):
         # Document results
         losses.update(0, 0, i, loss.data[0])
 
+        # Print statistics
+        if i % args.print_freq == 0:
+            print('Valiation: [{batch}/{total}]\t'
+                  'Loss {losses.val:.4f} ({losses.avg:.4f})'.format( batch = i,
+                    total = len(dataloader), losses=losses))
+
     return losses.avg
 
 def generate_output(indices, outputs, batch_index, path):
@@ -270,7 +320,7 @@ def generate_output(indices, outputs, batch_index, path):
 
     for i, output in enumerate(outputs):
         output = output.view(-1,2)
-        filename = path + 'gen_%i.csv' %(indices[i])
+        filename = path + 'gen_%s.csv' %(indices[i])
         numpy.savetxt(filename, output, comments='', delimiter=',',fmt='%.8f',
                         header='x,y')
 

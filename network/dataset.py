@@ -20,13 +20,21 @@ class OurDataset(Dataset):
         outputs = dic.get('output')
         self.outputs = outputs
 
-
         self.transform = transform
 
     def __len__(self):
         return len(self.indices)
 
+
+#    def __getitem__(self, idx):
+#        lidar = np.genfromtxt(self.lidars[idx], delimiter=',')
+#        return {'indices': self.indices[idx], 'lidar': lidar, \
+#                'value': self.values[idx], 'output': self.outputs[idx]}
+
     def __getitem__(self, idx):
         lidar = np.genfromtxt(self.lidars[idx], delimiter=',')
+        values = np.genfromtxt(self.values[idx], delimiter=',', skip_header=True)
+        values = np.nan_to_num(values)
+        output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
         return {'indices': self.indices[idx], 'lidar': lidar, \
-                'value': self.values[idx], 'output': self.outputs[idx]}
+                'value': values, 'output': output}

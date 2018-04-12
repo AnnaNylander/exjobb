@@ -32,23 +32,23 @@ def main():
     ratios are set, validate will consist of the remaining data.
     '''
     # Create directories
-    if not os.path.exists(SAVE_PATH + '/train'):
-        os.makedirs(SAVE_PATH + '/train/input/values')
-        os.makedirs(SAVE_PATH + '/train/input/topviews/max_elevation')
-        os.makedirs(SAVE_PATH + '/train/output')
-    if not os.path.exists(SAVE_PATH + '/test'):
-        os.makedirs(SAVE_PATH + '/test/input/values')
-        os.makedirs(SAVE_PATH + '/test/input/topviews/max_elevation')
-        os.makedirs(SAVE_PATH + '/test/output')
-    if not os.path.exists(SAVE_PATH + '/validate'):
-        os.makedirs(SAVE_PATH + '/validate/input/values')
-        os.makedirs(SAVE_PATH + '/validate/input/topviews/max_elevation')
-        os.makedirs(SAVE_PATH + '/validate/output')
+    if not os.path.exists(SAVE_PATH + 'train/'):
+        os.makedirs(SAVE_PATH + 'train/input/values/')
+        os.makedirs(SAVE_PATH + 'train/input/topviews/max_elevation/')
+        os.makedirs(SAVE_PATH + 'train/output/')
+    if not os.path.exists(SAVE_PATH + 'test/'):
+        os.makedirs(SAVE_PATH + 'test/input/values/')
+        os.makedirs(SAVE_PATH + 'test/input/topviews/max_elevation/')
+        os.makedirs(SAVE_PATH + 'test/output/')
+    if not os.path.exists(SAVE_PATH + 'validate/'):
+        os.makedirs(SAVE_PATH + 'validate/input/values/')
+        os.makedirs(SAVE_PATH + 'validate/input/topviews/max_elevation/')
+        os.makedirs(SAVE_PATH + 'validate/output/')
 
     # Get sorted filenames
-    input_values = sorted(os.listdir(DATA_PATH + '/input/values'))
-    input_topviews = sorted(os.listdir(DATA_PATH + '/input/topviews/max_elevation'))
-    output = sorted(os.listdir(DATA_PATH + '/output'))
+    input_values = sorted(os.listdir(DATA_PATH + 'input/values/'))
+    input_topviews = sorted(os.listdir(DATA_PATH + 'input/topviews/max_elevation/'))
+    output = sorted(os.listdir(DATA_PATH + 'output/'))
 
     # Get number of examples in each subset
     n_examples = len(input_values)
@@ -62,42 +62,42 @@ def main():
 
     # move or copy files
     for i in ind_train:
-        src = DATA_PATH + '/input/values/' + input_values[i]
-        dst = SAVE_PATH + '/train/input/values/' + input_values[i]
+        src = DATA_PATH + 'input/values/' + input_values[i]
+        dst = SAVE_PATH + 'train/input/values/' + input_values[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
-        src = DATA_PATH + '/input/topviews/max_elevation/' + input_topviews[i]
-        dst = SAVE_PATH + '/train/input/topviews/max_elevation/' + input_topviews[i]
+        src = DATA_PATH + 'input/topviews/max_elevation/' + input_topviews[i]
+        dst = SAVE_PATH + 'train/input/topviews/max_elevation/' + input_topviews[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
-        src = DATA_PATH + '/output/' + output[i]
-        dst = SAVE_PATH + '/train/output/' + output[i]
+        src = DATA_PATH + 'output/' + output[i]
+        dst = SAVE_PATH + 'train/output/' + output[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
     for i in ind_test:
-        src = DATA_PATH + '/input/values/' + input_values[i]
-        dst = SAVE_PATH + '/test/input/values/' + input_values[i]
+        src = DATA_PATH + 'input/values/' + input_values[i]
+        dst = SAVE_PATH + 'test/input/values/' + input_values[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
-        src = DATA_PATH + '/input/topviews/max_elevation/' + input_topviews[i]
-        dst = SAVE_PATH + '/test/input/topviews/max_elevation/' + input_topviews[i]
+        src = DATA_PATH + 'input/topviews/max_elevation/' + input_topviews[i]
+        dst = SAVE_PATH + 'test/input/topviews/max_elevation/' + input_topviews[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
-        src = DATA_PATH + '/output/' + output[i]
-        dst = SAVE_PATH + '/test/output/' + output[i]
+        src = DATA_PATH + 'output/' + output[i]
+        dst = SAVE_PATH + 'test/output/' + output[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
     for i in ind_validate:
-        src = DATA_PATH + '/input/values/' + input_values[i]
-        dst = SAVE_PATH + '/validate/input/values/' + input_values[i]
+        src = DATA_PATH + 'input/values/' + input_values[i]
+        dst = SAVE_PATH + 'validate/input/values/' + input_values[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
-        src = DATA_PATH + '/input/topviews/max_elevation/' + input_topviews[i]
-        dst = SAVE_PATH + '/validate/input/topviews/max_elevation/' + input_topviews[i]
+        src = DATA_PATH + 'input/topviews/max_elevation/' + input_topviews[i]
+        dst = SAVE_PATH + 'validate/input/topviews/max_elevation/' + input_topviews[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
-        src = DATA_PATH + '/output/' + output[i]
-        dst = SAVE_PATH + '/validate/output/' + output[i]
+        src = DATA_PATH + 'output/' + output[i]
+        dst = SAVE_PATH + 'validate/output/' + output[i]
         shutil.copy(src, dst) if args.copy else shutil.move(src, dst)
 
 if __name__ == "__main__":
