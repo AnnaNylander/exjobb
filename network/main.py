@@ -40,20 +40,24 @@ parser.add_argument('-s','--save-path', dest='save_path', default='',
                     type=str, metavar='PATH',
                     help = 'Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/\' (with trailing /)')
 
+parser.add_argument('-o','--optim', default='SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)', type=str,
+                    metavar='name(model.parameters(), param**)',
+                    help = 'optimizer and its param. Ex  \'SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)\' )')
+
 args = parser.parse_args()
 
 PATH_BASE = '/media/annaochjacob/crucial/'
 PATH_RESUME = PATH_BASE + 'models/' + args.resume
 PATH_SAVE = PATH_BASE + 'models/' + args.save_path
 PATH_DATA = PATH_BASE + 'dataset/' + args.dataset_path
-
 NUM_WORKERS = 3
 PIN_MEM = False
 
 def main():
     # variables
     best_res = 10000 #big number
-    learning_rate = 1e-5 #1e-4 NOTE too large can give NaN in forward pass! (Use 1e-4 and lower)
+
+    #learning_rate = 1e-5 #Not used with args.optim
     epoch_start = 0
     step_start = 0
     train_losses = ResultMeter()
@@ -80,7 +84,8 @@ def main():
         print("-----Creating lossfunction and optimizer-----")
         loss_fn = torch.nn.MSELoss().cuda()
         #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
-        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+        #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+        optimizer = eval('torch.optim.' + args.optim)
 
     #resume from checkpoint
     if args.resume:
@@ -97,8 +102,10 @@ def main():
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
         # loss function and optimizer
         print("\t Creating lossfunction and optimizer")
+        args.optim = checkpoint['optim']
         loss_fn = torch.nn.MSELoss().cuda()
-        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+        optimizer = eval('torch.optim.' + args.optim)
+        #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
 
         #load variables
         print("\t Loading variables")
@@ -212,12 +219,16 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     'step' : step + 1,
                     'state_dict': model.state_dict(),
                     'best_res': best_res,
+                    'optim' : args.optim,
                     'optimizer' : optimizer.state_dict(),
                     'train_losses' : train_losses.serialize(),
                     'validation_losses' : validation_losses.serialize(),
                     'times' : times.serialize()
                 }, is_best, is_all_time_best)
 
+            #TODO NOTE OBS OMG:
+            if i == 2000:
+                break
             step += 1
             #end of dataloader loop
 
@@ -240,6 +251,7 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
             'step' : step + 1,
             'state_dict': model.state_dict(),
             'best_res': best_res,
+            'optim' : args.optim,
             'optimizer' : optimizer.state_dict(),
             'train_losses' : train_losses.serialize(),
             'validation_losses' : validation_losses.serialize(),
@@ -253,7 +265,7 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
 def print_statistics(losses, times, batch_length):
     print('Epoch: [{0}][{1}/{2}]\t'
           'Batch time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-          'Loss {losses.val:.4f} ({losses.avg:.4f})'.format( losses.epoch,
+          'Batch loss {losses.val:.4f} ({losses.avg:.4f})'.format( losses.epoch,
            losses.batch, batch_length, batch_time=times, losses=losses))
 
 def train(model, batch, loss_fn, optimizer):
@@ -282,9 +294,9 @@ def validate(model, dataloader, loss_fn, save_output=False):
 
     for i, batch in enumerate(dataloader):
         # Read input and output into variables
-        lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor),volatile=True)
-        values = Variable((batch['value']).type(torch.cuda.FloatTensor),volatile=True)
-        targets = Variable((batch['output']).type(torch.cuda.FloatTensor),volatile=True)
+        lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor))#,volatile=True)
+        values = Variable((batch['value']).type(torch.cuda.FloatTensor))#,volatile=True)
+        targets = Variable((batch['output']).type(torch.cuda.FloatTensor))#,volatile=True)
         indices = batch['indices']
 
         # Set correct shape on input and output
