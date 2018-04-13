@@ -25,20 +25,21 @@ def getData(path, past_frames, frame_stride, max=-1,):
     return dic
 
 def getLidarFrames(path, indices, past_frames, frame_stride):
-    res = [[]]
+    res = []
     subdir = 'input/topviews/max_elevation/'
-    base_path = re.search('(train|validation|test)\/\Z', path).group(0)
-    folders = ['train/', 'validation/', 'test/']
+    base_path = re.search('.*(?=(train|validate|test)\/\Z)',path).group(0)
+    folders = ['train/', 'validate/', 'test/']
     for i in indices:
         frames = []
         frames.append(path+'input/topviews/max_elevation/me_%i.csv' %i) #main lidar picture. The current one.
-        for j in range(0,past_frames*frame_stride, frame_stride):
-            idx = i + j
+        # past lidar pictures
+        for j in range(1,past_frames*frame_stride+1, frame_stride):
+            idx = i - j
             frame = ''
             while frame == '':
                 for folder in folders:
-                    if os.isfile(base_path + folder + 'me_%i.csv' %idx):
-                        frame = base_path + folder + 'me_%i.csv' %idx)
+                    if os.path.isfile(base_path + folder + 'input/topviews/max_elevation/me_%i.csv' %idx):
+                        frame = base_path + folder + 'input/topviews/max_elevation/me_%i.csv' %idx
                 idx += 1
             frames.append(frame)
         res.append(frames)

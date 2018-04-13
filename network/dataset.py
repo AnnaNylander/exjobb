@@ -33,12 +33,11 @@ class OurDataset(Dataset):
 
     def __getitem__(self, idx):
         lidar = []
-        for l in lidars:
-            temp = np.genfromtxt(self.lidar[idx], delimiter=',')
+        for l in self.lidars[idx]:
+            temp = np.genfromtxt(l, delimiter=',')
             lidar.append(temp)
-
         values = np.genfromtxt(self.values[idx], delimiter=',', skip_header=True)
         values = np.nan_to_num(values)
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
-        return {'indices': self.indices[idx], 'lidar': lidar, \
+        return {'indices': self.indices[idx], 'lidar': np.stack(lidar, axis=0), \
                 'value': values, 'output': output}

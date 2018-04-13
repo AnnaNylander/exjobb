@@ -42,7 +42,7 @@ parser.add_argument('-s','--save-path', dest='save_path', default='',
 
 parser.add_argument('-o','--optim', default='SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)', type=str,
                     metavar='name(model.parameters(), param**)',
-                    help = 'optimizer and its param. Ex  \'SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)\' )')
+                    help = 'optimizer and its param. Ex/default: \'SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)\' )')
 parser.add_argument('-pf', '--past-frames', default=0, type=int, dest='past_frames',
                     metavar='N', help='Number of past lidar frames provided to the network. (default: 0) Note: Option not valid for RNN')
 parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_stride',
@@ -50,7 +50,7 @@ parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_st
                      '\n gives x, x-2, x-4. (default: 1) Note: Option not valid for RNN')
 
 #TODO: data_to_dict, dataset, main.
-# save, load, 
+# save, load,
 args = parser.parse_args()
 
 PATH_BASE = '/media/annaochjacob/crucial/'
@@ -132,15 +132,15 @@ def main():
 
     # Load datasets
     print("-----Loading datasets-----")
-    super_validate = {'indices': [], 'lidar': []}
-    super_train = {'indices': [], 'lidar': []}
-    super_test = {'indices': [], 'lidar': []}
+    super_validate = {}
+    super_train = {}
+    super_test = {}
     if not args.evaluate:
         # Create a dictionary containing paths to data in all smaller data sets
         for subdir in os.listdir(PATH_DATA):
             subpath = PATH_DATA + subdir + '/'
-            validation_data = getData(subpath + 'validate/', max = 300)
-            train_data = getData(subpath + 'train/')
+            validation_data = getData(subpath + 'validate/', args.past_frames, args.frame_stride, max = 300)
+            train_data = getData(subpath + 'train/', args.past_frames, args.frame_stride)
             for key in list(validation_data.keys()):
                 if key in super_validate:
                     super_validate[key] = numpy.concatenate((super_validate[key],validation_data[key]), axis=0)
@@ -160,7 +160,7 @@ def main():
 
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
-        test_data = getData(subpath + 'test/', max=10)
+        test_data = getData(subpath + 'test/', args.past_frames, args.frame_stride, max=10)
         for key in list(test_data.keys()):
             if key in super_test:
                 super_test[key] = numpy.concatenate((super_test[key], test_data[key]), axis=0)
@@ -237,9 +237,6 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     'times' : times.serialize()
                 }, is_best, is_all_time_best)
 
-            #TODO NOTE OBS OMG:
-            if i == 2000:
-                break
             step += 1
             #end of dataloader loop
 
@@ -284,11 +281,12 @@ def print_statistics(losses, times, batch_length):
 def train(model, batch, loss_fn, optimizer):
     model.train() # switch to train mode
 
+    #lidars = numpy.asarray(batch['lidar'])
     lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor))
     values = Variable((batch['value']).type(torch.cuda.FloatTensor))
     targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
 
-    lidars = lidars.view(-1, 1, 600, 600)
+    lidars = lidars.view(-1, args.past_frames+1, 600, 600)
     values = values.view(-1, 30, 11)
     targets = targets.view(-1, 60)
 
@@ -313,7 +311,7 @@ def validate(model, dataloader, loss_fn, save_output=False):
         indices = batch['indices']
 
         # Set correct shape on input and output
-        lidars = lidars.view(-1, 1, 600, 600)
+        lidars = lidars.view(-1, args.past_frames+1, 600, 600)
         values = values.view(-1, 30, 11)
         targets = targets.view(-1, 60)
 
