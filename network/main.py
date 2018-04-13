@@ -43,7 +43,14 @@ parser.add_argument('-s','--save-path', dest='save_path', default='',
 parser.add_argument('-o','--optim', default='SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)', type=str,
                     metavar='name(model.parameters(), param**)',
                     help = 'optimizer and its param. Ex  \'SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)\' )')
+parser.add_argument('-pf', '--past-frames', default=0, type=int, dest='past_frames',
+                    metavar='N', help='Number of past lidar frames provided to the network. (default: 0) Note: Option not valid for RNN')
+parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_stride',
+                    metavar='N', help='Stride of past frames. Ex. past-frames=2 and frames-stride=2 where x is current frame'\
+                     '\n gives x, x-2, x-4. (default: 1) Note: Option not valid for RNN')
 
+#TODO: data_to_dict, dataset, main.
+# save, load, 
 args = parser.parse_args()
 
 PATH_BASE = '/media/annaochjacob/crucial/'
@@ -109,6 +116,8 @@ def main():
 
         #load variables
         print("\t Loading variables")
+        args.past_frames = checkpoint['past_frames']
+        args.frame_stride = checkpoint['frame_stride']
         epoch_start = checkpoint['epoch']
         step_start = checkpoint['step']
         model.load_state_dict(checkpoint['state_dict'])
@@ -215,6 +224,8 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                 # Save checkpoint
                 save_checkpoint({
                     'arch' : args.arch,
+                    'past_frames': args.past_frames,
+                    'frame_stride': args.frame_stride,
                     'epoch': epoch + 1,
                     'step' : step + 1,
                     'state_dict': model.state_dict(),
@@ -247,6 +258,8 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
         # Save checkpoint
         save_checkpoint({
             'arch' : args.arch,
+            'past_frames': args.past_frames,
+            'frame_stride': args.frame_stride,
             'epoch': epoch + 1,
             'step' : step + 1,
             'state_dict': model.state_dict(),

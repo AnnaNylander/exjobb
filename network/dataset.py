@@ -32,7 +32,11 @@ class OurDataset(Dataset):
 #                'value': self.values[idx], 'output': self.outputs[idx]}
 
     def __getitem__(self, idx):
-        lidar = np.genfromtxt(self.lidars[idx], delimiter=',')
+        lidar = []
+        for l in lidars:
+            temp = np.genfromtxt(self.lidar[idx], delimiter=',')
+            lidar.append(temp)
+
         values = np.genfromtxt(self.values[idx], delimiter=',', skip_header=True)
         values = np.nan_to_num(values)
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)

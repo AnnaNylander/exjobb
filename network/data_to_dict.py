@@ -2,7 +2,7 @@ import os
 import re
 import numpy as np
 
-def getData(path,max=-1):
+def getData(path, past_frames, frame_stride, max=-1,):
     print("Loading: " + path)
     path_topviews = path + 'input/topviews/max_elevation/'
     path_values = path + 'input/values/'
@@ -11,18 +11,40 @@ def getData(path,max=-1):
         max = len(os.listdir(path_topviews))
 
     dic = {}
-    #print('\tINDICES')
     indices = getIndices(path_topviews, max)
     dic['indices'] = indices #['%s_%i' %(path,i) for i in indices]
-    #print('\tLIDAR')
-    dic['lidar'] = [path+'input/topviews/max_elevation/me_%i.csv' %i for i in indices]  #path for lidar picture
-    #print('\tVALUES')
+
+    #dic['lidar'] = [path+'input/topviews/max_elevation/me_%i.csv' %i for i in indices]  #path for lidar picture
+
+    dic['lidar'] = getLidarFrames(path, indices, past_frames, frame_stride)
+
     dic['values'] = [path+'input/values/input_%i.csv' %i for i in indices]
     #dic['values'] = getArray(path_values, 30, 11, True, indices, 'input_')
-    #print('\tOUTPUT')
     dic['output'] = [path+'output/output_%i.csv' %i for i in indices]
     #dic['output'] = getArray(path_output, 30, 2, True, indices, 'output_')
     return dic
+
+def getLidarFrames(path, indices, past_frames, frame_stride):
+    res = [[]]
+    subdir = 'input/topviews/max_elevation/'
+    base_path = re.search('(train|validation|test)\/\Z', path).group(0)
+    folders = ['train/', 'validation/', 'test/']
+    for i in indices:
+        frames = []
+        frames.append(path+'input/topviews/max_elevation/me_%i.csv' %i) #main lidar picture. The current one.
+        for j in range(0,past_frames*frame_stride, frame_stride):
+            idx = i + j
+            frame = ''
+            while frame == '':
+                for folder in folders:
+                    if os.isfile(base_path + folder + 'me_%i.csv' %idx):
+                        frame = base_path + folder + 'me_%i.csv' %idx)
+                idx += 1
+            frames.append(frame)
+        res.append(frames)
+    return res
+
+
 
 def getArray(path, h, w, header, indices, filename):
     # count files
