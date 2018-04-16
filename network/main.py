@@ -21,8 +21,8 @@ from result_meter import ResultMeter
 parser = argparse.ArgumentParser(description='PyTorch Drive a car wohoo')
 parser.add_argument('-a','--arch', default='', type=str, metavar='file.class',
                     help = 'Name of network to use. eg: LucaNetwork.LucaNet')
-parser.add_argument('-b', '--batch-size', default=20, type=int,
-                    metavar='N', help='mini-batch size (default: 20)')
+parser.add_argument('-b', '--batch-size', default=16, type=int,
+                    metavar='N', help='mini-batch size (default: 16)')
 parser.add_argument('-e', '--epochs', default=10, type=int,
                     metavar='N', help='number of total epochs (default: 10)')
 parser.add_argument('-p','--print-freq', default=100, type=int,
