@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import re
 from torch.utils.data import Dataset, DataLoader
 from torch.autograd import Variable
 import torch
@@ -39,5 +40,9 @@ class OurDataset(Dataset):
         values = np.genfromtxt(self.values[idx], delimiter=',', skip_header=True)
         values = np.nan_to_num(values)
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
+        foldername = ''
+        foldername_search= re.search('(?<=\/)\w*(?=\/(train|test|validate))', str(self.lidars[idx]))
+        if foldername_search is not None:
+            foldername = foldername_search.group()
         return {'indices': self.indices[idx], 'lidar': np.stack(lidar, axis=0), \
-                'value': values, 'output': output}
+                'value': values, 'output': output, 'foldername': foldername}

@@ -160,7 +160,7 @@ def main():
 
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
-        test_data = getData(subpath + 'test/', args.past_frames, args.frame_stride, max=10)
+        test_data = getData(subpath + 'test/', args.past_frames, args.frame_stride)
         for key in list(test_data.keys()):
             if key in super_test:
                 super_test[key] = numpy.concatenate((super_test[key], test_data[key]), axis=0)
@@ -324,26 +324,28 @@ def validate(model, dataloader, loss_fn, save_output=False):
             current_batch_size = numpy.size(output,0)
             outputs = numpy.split(output.data, current_batch_size, 0)
             path = PATH_SAVE + 'generated_output/'
-            generate_output(indices, outputs, i, path)
+            generate_output(indices, outputs, batch['foldername'], path)
 
         # Document results
         losses.update(0, 0, i, loss.data[0])
 
         # Print statistics
         if i % args.print_freq == 0:
-            print('Valiation: [{batch}/{total}]\t'
+            print('Validation: [{batch}/{total}]\t'
                   'Loss {losses.val:.4f} ({losses.avg:.4f})'.format( batch = i,
                     total = len(dataloader), losses=losses))
 
     return losses.avg
 
-def generate_output(indices, outputs, batch_index, path):
+def generate_output(indices, outputs, foldername, path):
     if not os.path.exists(path):
         os.makedirs(path)
-
     for i, output in enumerate(outputs):
+        subpath = path + str(foldername[i]) + '/'
+        if not os.path.exists(subpath):
+            os.makedirs(subpath)
         output = output.view(-1,2)
-        filename = path + 'gen_%s.csv' %(indices[i])
+        filename = subpath + 'gen_%i.csv' %(int(indices[i]))
         numpy.savetxt(filename, output, comments='', delimiter=',',fmt='%.8f',
                         header='x,y')
 

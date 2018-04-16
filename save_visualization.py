@@ -35,27 +35,28 @@ CELLS = 600
 SIDE = 60
 PATH_BASE = '/media/annaochjacob/crucial/'
 PATH_DATA = PATH_BASE +'dataset/'+ args.dataset
-PATH_POINT_CLOUD = PATH_BASE +'recorded_data/carla/'+ args.recorded + 'point_cloud/'
-PATH_PREDICTION = PATH_BASE +'models/'+ args.saved_models + 'generated_output/'
+PATH_RECORDED_DATA = PATH_BASE +'recorded_data/carla/'+ args.recorded# + 'point_cloud/'
+PATH_MODELS = PATH_BASE +'models/'+ args.saved_models# + 'generated_output/'
 SAVE_PATH = args.save_path
 SUBPLOT_ROWS = 1
 SUBPLOT_COLS = 1
 
 def main():
     # if only one timeStep
-    if args.timeStep is not None:
-        visualize(args.timeStep, SAVE_PATH, args.prediction, args.everything)
+    #if args.timeStep is not None:
+    #    visualize(args.timeStep, args.prediction, args.everything)
 
     # else save all in folder.
-    else:
-        indices = getIndices(PATH_DATA)
+    #else:
+    for folder in os.listdir(PATH_DATA):
+        indices = getIndices(PATH_DATA + folder+'/')
         indices = sorted(indices)
         for i in indices:
-            visualize(i, SAVE_PATH, args.prediction, args.everything)
+            visualize(i, args.prediction, args.everything, folder=folder+'/')
             print(i)
 
 def getIndices(path):
-    path = path + 'input/values/'
+    path = path + 'test/input/values/'
     nr_of_files = len(os.listdir(path))
     res = np.zeros([nr_of_files])
     idx = 0
@@ -64,7 +65,6 @@ def getIndices(path):
         res[idx] = data
         idx = idx + 1
     return res
-
 
 def plot(x, y ,c , image ,subplot_rows, subplot_cols, subplot_index, title, side):
     plt.subplot(subplot_rows, subplot_cols, subplot_index)
@@ -80,7 +80,13 @@ def plot(x, y ,c , image ,subplot_rows, subplot_cols, subplot_index, title, side
     axes.set_aspect('equal')
     axes.set_title(title)
 
-def visualize(step, path, prediction, everything):
+def visualize(step, prediction, everything, folder=''):
+    # if we want prediction but the file doesn't exist, skip and return.
+    if prediction:
+        path_pred = PATH_MODELS + 'generated_output/' +folder +  'gen_%i.csv' % step
+        if not os.path.isfile(path_pred):
+            return
+
     plt.gcf().clear()
     SUBPLOT_ROWS = 1
     SUBPLOT_COLS = 1
@@ -89,21 +95,23 @@ def visualize(step, path, prediction, everything):
         SUBPLOT_COLS = 2
 
     # Read point cloud and generate top view image
-    filename = PATH_POINT_CLOUD + 'pc_%i.csv' % step
+    # if folder name containts split, then remove '_split'
+    folder_without_split = re.sub('_split','',folder)
+    filename = PATH_RECORDED_DATA + folder_without_split + 'point_cloud/' + 'pc_%i.csv' % step
     point_cloud = np.genfromtxt(filename, delimiter=',', skip_header=True)
     point_cloud = trim_to_roi(point_cloud, ROI)
     topview_img = lidar_to_topview(point_cloud, ROI, CELLS)
     topview_img = topview_img.squeeze()
 
     #past
-    path_input = PATH_DATA + 'input/values/input_%i.csv' % step
+    path_input = PATH_DATA + folder + 'test/input/values/input_%i.csv' % step
     values_past = np.genfromtxt(path_input, delimiter=',', skip_header=True)
     past_loc_x = values_past[:,0]
     past_loc_y = values_past[:,1]
     plot_past = plot(past_loc_x, past_loc_y, 'r', topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 1,'Past and future path',SIDE)
 
     #future
-    path_output = PATH_DATA + 'output/output_%i.csv' % step
+    path_output = PATH_DATA + folder + 'test/output/output_%i.csv' % step
     values_future = np.genfromtxt(path_output, delimiter=',', skip_header=True)
     future_loc_x = values_future[:,0]
     future_loc_y = values_future[:,1]
@@ -111,7 +119,7 @@ def visualize(step, path, prediction, everything):
 
     #prediction
     if prediction:
-        path_pred = PATH_PREDICTION + 'gen_%i.csv' % step
+        #path_pred = PATH_MODELS + 'generated_output/' +folder +  'gen_%i.csv' % step
         values_pred = np.genfromtxt(path_pred, delimiter=',', skip_header=True)
         pred_loc_x = values_pred[:,0]
         pred_loc_y = values_pred[:,1]
@@ -126,7 +134,7 @@ def visualize(step, path, prediction, everything):
         plot(past_loc_x, past_loc_y, past_fwd_speed, topview_img, SUBPLOT_ROWS,SUBPLOT_COLS, 3,'Forward speed',SIDE)
         plot(past_loc_x, past_loc_y, past_steer, topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 4,'Steer',SIDE)
 
-    plt.savefig(path + 'img_%i.png' %step)
+    plt.savefig(SAVE_PATH + 'img_%s%i.png' %(re.sub('\/','',folder),step))
 
 if __name__ == "__main__":
     main()
