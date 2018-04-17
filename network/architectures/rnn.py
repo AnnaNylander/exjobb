@@ -5,37 +5,38 @@ import torch.nn.modules.normalization as mm
 import numpy
 import torch
 
+PRINT = True
+
 ''' Processes lidar and values for each time step to produce a path.
 '''
 
 class LSTMNet(nn.Module):
     ''' Using LSTM cells '''
     def __init__(self):
-        super(LSTM, self).__init__()
+        super(LSTMNet, self).__init__()
 
         # LSTM architecture definitions
-        input_size = 500 # The number of expected features in the input x
+        input_size = 636 # The number of expected features in the input x
         hidden_size = 300 # The number of features in the hidden state h
         num_layers = 2 # Number of recurrent layers
         dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
         bidirectional = False # If True, becomes a bidirectional LSTM
 
-        # encoder
-        self.conv_e0 = nn.Conv2d(1,8,3, padding=1)
-        self.bias_e0 = nn.Linear(330, 8, bias=false) # 330 x 8
+        # lidar encoder
+        self.conv_e0 = nn.Conv2d(30, 32, 3, padding=1)
 
-        self.conv_e1 = nn.Conv2d(8,8,3, padding=1)
+        self.conv_e1 = nn.Conv2d(32, 32, 3, padding=1)
         self.maxpool_e1 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_e2 = nn.Conv2d(8,16,3, padding=1)
+        self.conv_e2 = nn.Conv2d(32, 64, 3, padding=1)
 
-        self.conv_e3 = nn.Conv2d(16,16,3, padding=1)
+        self.conv_e3 = nn.Conv2d(64, 64, 3, padding=1)
         self.maxpool_e3 = nn.MaxPool2d(2, stride=2)
 
         # context modules
         self.spatial_dropout = nn.Dropout2d(p=0.2)
 
-        self.conv_c0 = nn.Conv2d(16,96,3, padding=1, dilation=1)
+        self.conv_c0 = nn.Conv2d(64,96,3, padding=1, dilation=1)
         self.conv_c1 = nn.Conv2d(96,96,3, padding=1, dilation=1)
         self.conv_c2 = nn.Conv2d(96,96,3, padding=(2,1), dilation=(2,1))
         self.conv_c3 = nn.Conv2d(96,96,3, padding=(4,2), dilation=(4,2))
@@ -47,72 +48,95 @@ class LSTMNet(nn.Module):
         self.conv_c9 = nn.Conv2d(96,96,3, padding=(28,24), dilation=(28,24))
         self.conv_c10 = nn.Conv2d(96,96,3, padding=(32,28), dilation=(32,28))
         self.conv_c11 = nn.Conv2d(96,96,3, padding=(1,32), dilation=(1,32))
-        self.conv_c12 = nn.Conv2d(96,16,3, padding=1, dilation=1)
+        self.conv_c12 = nn.Conv2d(96,64,3, padding=1, dilation=1)
 
-        # decoder convolutions # 150 x 150 x 16
-        self.conv_d0 = nn.Conv2d(16,8,3, padding=1)
-        self.maxpool_d0 = nn.Conv2d(3, stride=3)            # 50 x 50 x 16
+        # decoder convolutions # 150 x 150 x 32
+        self.conv_d0 = nn.Conv2d(64,64,3, padding=1)
+        self.maxpool_d0 = nn.MaxPool2d(3, stride=3)
 
-        self.conv_d1 = nn.Conv2d(8,1,3, padding=1)
-        self.maxpool_d1 = nn.Conv2d(2, stride=2)            # 25 x 25 x 16
-        self.linear_d1 = nn.Linear(25*25 + 11,input_size)
+        self.conv_d1 = nn.Conv2d(64,32,3, padding=1)
+        self.maxpool_d1 = nn.MaxPool2d(2, stride=2)
 
-        self.lstm = nn.LSTM(input_size=input_size,
+        self.conv_d2 = nn.Conv2d(32,30,3, padding=1)
+
+        self.lstm_d3 = nn.LSTM(input_size=input_size,
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             dropout=dropout,
                             bidirectional=bidirectional)
 
-        # Initialize hidden state
-        self.hidden = self.init_hidden()
+        self.linear_d3 = nn.Linear(300,60)
+
 
     def forward(self, l, v):
-        # input
-        # TODO WHAT SHAPE TO USE HERE?
-        v = v.view(-1, 30*11)                               # 330 x 1
+
+        # l is expected to be of shape [2, 30, 600, 600]
+        # v is expected to be of shape [2, 30, 11]
 
         # encoder
-        # TODO WHAT SHAPE TO USE HERE?
-        l = F.elu(self.conv_e0(l))
+        l = F.elu(self.conv_e0(l))                              # [2, 32, 600, 600]
 
-        l = F.elu(self.conv_e1(l))           # 600 x 600 x 8
-        l = self.maxpool_e1(l)                                # 300 x 300 x 8
+        l = F.elu(self.conv_e1(l))                              # [2, 32, 600, 600]
+        l = self.maxpool_e1(l)                                  # [2, 32, 300, 300]
 
-        l = F.elu(self.conv_e2(l))           # 600 x 600 x 8
+        l = F.elu(self.conv_e2(l))                              # [2, 64, 300, 300]
 
-        l = F.elu(self.conv_e3(l))           # 600 x 600 x 8
-        l = self.maxpool_e3(l)                                # 150 x 150 x 16
+        l = F.elu(self.conv_e3(l))                              # [2, 64, 300, 300]
+        l = self.maxpool_e3(l)                                  # [2, 64, 150, 150]
 
         #context module
-        l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # 150 x 150 x 96
-        l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # 150 x 150 x 96
-        l = F.elu(self.conv_c11(l))                             # 150 x 150 x 96
+        l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
+        l = F.elu(self.conv_c12(l))                             # [2, 64, 150, 150]
+        print_size(l,PRINT)
 
         # decoder convolutions
-        l = F.elu(self.conv_d0(l))
-        l = self.maxpool_d0(l)                              # 50 x 50 x 8
+        l = F.elu(self.conv_d0(l))                              # [2, 64, 150, 150]
+        print_size(l,PRINT)
+        l = self.maxpool_d0(l)                                  # [2, 64, 50, 50]
+        print_size(l,PRINT)
 
-        l = F.elu(self.conv_d1(l))
-        l = self.maxpool_d1(l)                              # 25 x 25 x 1
+        l = F.elu(self.conv_d1(l))                              # [2, 32, 50, 50]
+        print_size(l,PRINT)
+        l = self.maxpool_d1(l)                                  # [2, 32, 25, 25]
+        print_size(l,PRINT)
 
-        # Construct lstm input vector
-        e = torch.cat(l, v)
-        e = self.linear_d1(e)
+        l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
+        print_size(l,PRINT)
+
+        l = l.view(2,30,-1)                                     # [2, 30, 625]
+        print_size(l,PRINT)
+
+        # Construct lstm input vectors by concatenating the values to the lidar
+        e = torch.cat((l, v),2)                                 # [2, 30, 636]
+        print_size(e,PRINT)
+
+        e = e.transpose(0,1)                                    # [30, 2, 636]
+        print_size(e, PRINT)
 
         # Feed input into lstm to get output.
-        # Output has shape (seq_len, batch, hidden_size * num_directions)
-        output, self.hidden = self.lstm(e, self.hidden)
+        # Output y has shape (seq_len, batch, hidden_size * num_directions)
+        y, hn = self.lstm_d3(e)                                 # [30, 2, 300]
+        print_size(y,PRINT)
 
+        y = self.linear_d3(y[-1])                               # [2, 60]
+        print_size(y,PRINT)
+
+        return y
+
+    # TODO This function is not necessary, because we init the state to 0 by
+    # 
     def init_hidden():
         ''' Use this to reset the hidden state between inferences '''
         h_0 = Variable(torch.zeros(1, 1, self.hidden_size))
@@ -127,7 +151,16 @@ class GRUNet(nn.Module):
 
     '''
     def __init__(self):
-        super(CNNOnly, self).__init__()
+        super(GRUNet, self).__init__()
 
     def forward(self, l, v):
         return l
+
+def expand_biases(v, w, h):
+    b = v.size(0) # batch size
+    c = v.size(1) # number of channels
+    return v.unsqueeze(2).expand(b,c,h).unsqueeze(3).expand(b,c,h,w)
+
+def print_size(tensor, cond):
+    if cond:
+        print(tensor.size())
