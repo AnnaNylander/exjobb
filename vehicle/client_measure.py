@@ -41,7 +41,7 @@ def run_carla_client(args):
 
             settings = CarlaSettings()
             settings.set(
-                SynchronousMode=True,
+                SynchronousMode=False,
                 SendNonPlayerAgentsInfo=True,
                 NumberOfVehicles=0,
                 NumberOfPedestrians=0,
@@ -61,8 +61,8 @@ def run_carla_client(args):
             print('Starting new episode...')
             client.start_episode(player_start)
 
-            # Create matrix for holding time, acceleration and throttle
-            values = np.zeros([frames_per_episode, 3])
+            # Create matrix for holding time, acceleration and throttle, velocity
+            values = np.zeros([frames_per_episode,8])
 
             # Iterate every frame in the episode.
             for frame in range(0, frames_per_episode):
@@ -71,8 +71,8 @@ def run_carla_client(args):
                 measurements, sensor_data = client.read_data()
 
                 # Get time and acceleration
-                time, acc = get_values(measurements)
-                values[frame,:] = [time, acc, throttle]
+                time, acc, v, yaw,x,y,z = get_values(measurements)
+                values[frame,:] = [time, acc, throttle, v, yaw,x,y,z]
 
                 # Print some of the measurements.
                 #print_measurements(measurements)
@@ -87,10 +87,11 @@ def run_carla_client(args):
                 control.throttle = throttle
                 control.brake = 0
                 client.send_control(control)
+                time.sleep( 500)
 
             # Save measured values
             filename = '/home/annaochjacob/Repos/carla/PythonClient/throttle_measurements/throttle_%.2f.csv' % throttle
-            header = 'time,acceleration,throttle'
+            header = 'time,acceleration,throttle,velocity,yaw,x,y,z'
             np.savetxt(filename, values, delimiter=',', comments='', fmt='%.4f')
 
 
@@ -119,9 +120,16 @@ def get_values(measurements):
     acc_x = player_measurements.acceleration.x
     acc_y = player_measurements.acceleration.y
     acc_z = player_measurements.acceleration.z
-    acceleration = math.sqrt(acc_x**2 + acc_y**2 + acc_z**2)
+    acceleration = math.sqrt(acc_x**2 + acc_y**2)# + acc_z**2)
+    yaw = player_measurements.player.transform.rotation.yaw
+    x = player_measurements.player.tranform.location.x
+    y = player_measurements.player.tranform.location.y
+    z = player_measurements.player.tranform.location.z
+    print('x,y,z')
+    print(x,y,z)
+    velocity = player_measurements.player.forward_speed
     time = measurements.game_timestamp
-    return time, acceleration
+    return time, acceleration, velocity, yaw,x,y,z
 
 
 def main():
