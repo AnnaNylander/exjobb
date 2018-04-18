@@ -135,8 +135,121 @@ class LSTMNet(nn.Module):
 
         return y
 
+class LSTMNetBi(nn.Module):
+    ''' Using bidirectional LSTM cells '''
+    def __init__(self):
+        super(LSTMNetBi, self).__init__()
+
+        # LSTM architecture definitions
+        input_size = 636 # The number of expected features in the input x
+        hidden_size = 300 # The number of features in the hidden state h
+        num_layers = 2 # Number of recurrent layers
+        dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
+        bidirectional = True # If True, becomes a bidirectional LSTM
+
+        # lidar encoder
+        self.conv_e0 = nn.Conv2d(30, 32, 3, padding=1)
+
+        self.conv_e1 = nn.Conv2d(32, 32, 3, padding=1)
+        self.maxpool_e1 = nn.MaxPool2d(2, stride=2)
+
+        self.conv_e2 = nn.Conv2d(32, 64, 3, padding=1)
+
+        self.conv_e3 = nn.Conv2d(64, 64, 3, padding=1)
+        self.maxpool_e3 = nn.MaxPool2d(2, stride=2)
+
+        # context modules
+        self.spatial_dropout = nn.Dropout2d(p=0.2)
+
+        self.conv_c0 = nn.Conv2d(64,96,3, padding=1, dilation=1)
+        self.conv_c1 = nn.Conv2d(96,96,3, padding=1, dilation=1)
+        self.conv_c2 = nn.Conv2d(96,96,3, padding=(2,1), dilation=(2,1))
+        self.conv_c3 = nn.Conv2d(96,96,3, padding=(4,2), dilation=(4,2))
+        self.conv_c4 = nn.Conv2d(96,96,3, padding=(8,4), dilation=(8,4))
+        self.conv_c5 = nn.Conv2d(96,96,3, padding=(12,8), dilation=(12,8))
+        self.conv_c6 = nn.Conv2d(96,96,3, padding=(16,12), dilation=(16,12))
+        self.conv_c7 = nn.Conv2d(96,96,3, padding=(20,16), dilation=(20,16))
+        self.conv_c8 = nn.Conv2d(96,96,3, padding=(24,20), dilation=(24,20))
+        self.conv_c9 = nn.Conv2d(96,96,3, padding=(28,24), dilation=(28,24))
+        self.conv_c10 = nn.Conv2d(96,96,3, padding=(32,28), dilation=(32,28))
+        self.conv_c11 = nn.Conv2d(96,96,3, padding=(1,32), dilation=(1,32))
+        self.conv_c12 = nn.Conv2d(96,64,3, padding=1, dilation=1)
+
+        # decoder convolutions # 150 x 150 x 32
+        self.conv_d0 = nn.Conv2d(64,64,3, padding=1)
+        self.maxpool_d0 = nn.MaxPool2d(3, stride=3)
+
+        self.conv_d1 = nn.Conv2d(64,32,3, padding=1)
+        self.maxpool_d1 = nn.MaxPool2d(2, stride=2)
+
+        self.conv_d2 = nn.Conv2d(32,30,3, padding=1)
+
+        self.lstm_d3 = nn.LSTM(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            dropout=dropout,
+                            bidirectional=bidirectional)
+
+        self.linear_d3 = nn.Linear(hidden_size*2,60)
+
+
+    def forward(self, l, v):
+
+        # l is expected to be of shape [2, 30, 600, 600]
+        # v is expected to be of shape [2, 30, 11]
+
+        # encoder
+        l = F.elu(self.conv_e0(l))                              # [2, 32, 600, 600]
+
+        l = F.elu(self.conv_e1(l))                              # [2, 32, 600, 600]
+        l = self.maxpool_e1(l)                                  # [2, 32, 300, 300]
+
+        l = F.elu(self.conv_e2(l))                              # [2, 64, 300, 300]
+
+        l = F.elu(self.conv_e3(l))                              # [2, 64, 300, 300]
+        l = self.maxpool_e3(l)                                  # [2, 64, 150, 150]
+
+        #context module
+        l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
+        l = F.elu(self.conv_c12(l))                             # [2, 64, 150, 150]
+
+        # decoder convolutions
+        l = F.elu(self.conv_d0(l))                              # [2, 64, 150, 150]
+        l = self.maxpool_d0(l)                                  # [2, 64, 50, 50]
+
+        l = F.elu(self.conv_d1(l))                              # [2, 32, 50, 50]
+        l = self.maxpool_d1(l)                                  # [2, 32, 25, 25]
+
+        l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
+
+        l = l.view(2,30,-1)                                     # [2, 30, 625]
+
+        # Construct lstm input vectors by concatenating the values to the lidar
+        e = torch.cat((l, v),2)                                 # [2, 30, 636]
+
+        e = e.transpose(0,1)                                    # [30, 2, 636]
+
+        # Feed input into lstm to get output.
+        # Output y has shape (seq_len, batch, hidden_size * num_directions)
+        y, hn = self.lstm_d3(e)                                 # [30, 2, 600]
+        y = self.linear_d3(y[-1])                               # [2, 60]
+
+        return y
+
     # TODO This function is not necessary, because we init the state to 0 by
-    # 
+    #
     def init_hidden():
         ''' Use this to reset the hidden state between inferences '''
         h_0 = Variable(torch.zeros(1, 1, self.hidden_size))
@@ -145,16 +258,126 @@ class LSTMNet(nn.Module):
 
 
 class GRUNet(nn.Module):
-    ''' Using GRU cells
-
-        GET LSTM TO WORK FIRST, THEN IT SHOULD BE A MATTER OF COPY + PASTE HERE
-
-    '''
+    ''' Using bidirectional LSTM cells '''
     def __init__(self):
         super(GRUNet, self).__init__()
 
+        # LSTM architecture definitions
+        input_size = 636 # The number of expected features in the input x
+        hidden_size = 300 # The number of features in the hidden state h
+        num_layers = 2 # Number of recurrent layers
+        dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
+        bidirectional = False # If True, becomes a bidirectional LSTM
+
+        # lidar encoder
+        self.conv_e0 = nn.Conv2d(30, 32, 3, padding=1)
+
+        self.conv_e1 = nn.Conv2d(32, 32, 3, padding=1)
+        self.maxpool_e1 = nn.MaxPool2d(2, stride=2)
+
+        self.conv_e2 = nn.Conv2d(32, 64, 3, padding=1)
+
+        self.conv_e3 = nn.Conv2d(64, 64, 3, padding=1)
+        self.maxpool_e3 = nn.MaxPool2d(2, stride=2)
+
+        # context modules
+        self.spatial_dropout = nn.Dropout2d(p=0.2)
+
+        self.conv_c0 = nn.Conv2d(64,96,3, padding=1, dilation=1)
+        self.conv_c1 = nn.Conv2d(96,96,3, padding=1, dilation=1)
+        self.conv_c2 = nn.Conv2d(96,96,3, padding=(2,1), dilation=(2,1))
+        self.conv_c3 = nn.Conv2d(96,96,3, padding=(4,2), dilation=(4,2))
+        self.conv_c4 = nn.Conv2d(96,96,3, padding=(8,4), dilation=(8,4))
+        self.conv_c5 = nn.Conv2d(96,96,3, padding=(12,8), dilation=(12,8))
+        self.conv_c6 = nn.Conv2d(96,96,3, padding=(16,12), dilation=(16,12))
+        self.conv_c7 = nn.Conv2d(96,96,3, padding=(20,16), dilation=(20,16))
+        self.conv_c8 = nn.Conv2d(96,96,3, padding=(24,20), dilation=(24,20))
+        self.conv_c9 = nn.Conv2d(96,96,3, padding=(28,24), dilation=(28,24))
+        self.conv_c10 = nn.Conv2d(96,96,3, padding=(32,28), dilation=(32,28))
+        self.conv_c11 = nn.Conv2d(96,96,3, padding=(1,32), dilation=(1,32))
+        self.conv_c12 = nn.Conv2d(96,64,3, padding=1, dilation=1)
+
+        # decoder convolutions # 150 x 150 x 32
+        self.conv_d0 = nn.Conv2d(64,64,3, padding=1)
+        self.maxpool_d0 = nn.MaxPool2d(3, stride=3)
+
+        self.conv_d1 = nn.Conv2d(64,32,3, padding=1)
+        self.maxpool_d1 = nn.MaxPool2d(2, stride=2)
+
+        self.conv_d2 = nn.Conv2d(32,30,3, padding=1)
+
+        self.gru_d3 = nn.GRU(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            dropout=dropout,
+                            bidirectional=bidirectional)
+
+        self.linear_d3 = nn.Linear(300,60)
+
+
     def forward(self, l, v):
-        return l
+
+        # l is expected to be of shape [2, 30, 600, 600]
+        # v is expected to be of shape [2, 30, 11]
+
+        # encoder
+        l = F.elu(self.conv_e0(l))                              # [2, 32, 600, 600]
+
+        l = F.elu(self.conv_e1(l))                              # [2, 32, 600, 600]
+        l = self.maxpool_e1(l)                                  # [2, 32, 300, 300]
+
+        l = F.elu(self.conv_e2(l))                              # [2, 64, 300, 300]
+
+        l = F.elu(self.conv_e3(l))                              # [2, 64, 300, 300]
+        l = self.maxpool_e3(l)                                  # [2, 64, 150, 150]
+
+        #context module
+        l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
+        l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
+        l = F.elu(self.conv_c12(l))                             # [2, 64, 150, 150]
+
+
+        # decoder convolutions
+        l = F.elu(self.conv_d0(l))                              # [2, 64, 150, 150]
+        l = self.maxpool_d0(l)                                  # [2, 64, 50, 50]
+
+        l = F.elu(self.conv_d1(l))                              # [2, 32, 50, 50]
+        l = self.maxpool_d1(l)                                  # [2, 32, 25, 25]
+
+        l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
+
+        l = l.view(2,30,-1)                                     # [2, 30, 625]
+
+        # Construct lstm input vectors by concatenating the values to the lidar
+        e = torch.cat((l, v),2)                                 # [2, 30, 636]
+
+        e = e.transpose(0,1)                                    # [30, 2, 636]
+
+        # Feed input into lstm to get output.
+        # Output y has shape (seq_len, batch, hidden_size * num_directions)
+        y, hn = self.gru_d3(e)                                 # [30, 2, 300]
+        y = self.linear_d3(y[-1])                               # [2, 60]
+
+        return y
+
+    # TODO This function is not necessary, because we init the state to 0 by
+    #
+    def init_hidden():
+        ''' Use this to reset the hidden state between inferences '''
+        h_0 = Variable(torch.zeros(1, 1, self.hidden_size))
+        c_0 = Variable(torch.zeros(1, 1, self.hidden_size))
+        return (h_0, c_0)
 
 def expand_biases(v, w, h):
     b = v.size(0) # batch size

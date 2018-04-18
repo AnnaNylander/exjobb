@@ -1,6 +1,6 @@
 #from cnn_bias import CNNBiasFirst, CNNBiasLast, CNNBiasAll
 #from cnn_deluxe import CNNOnly, CNNLSTM
-#from rnn import LSTMNet, GRUNet
+#from rnn import LSTMNet, LSTMNetBi, GRUNet
 #import torch
 #from torch.autograd import Variable
 #import torch.nn as nn
@@ -18,7 +18,7 @@
     #print(values.size())
 
     # Instantiate model
-#    model = LSTMNet()
+#    model = GRUNet()
 #    model(lidars, values)
 
 
