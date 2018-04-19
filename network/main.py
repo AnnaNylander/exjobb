@@ -44,11 +44,11 @@ parser.add_argument('-o','--optim', default='SGD(model.parameters(), lr=1e-5, mo
                     metavar='name(model.parameters(), param**)',
                     help = 'optimizer and its param. Ex/default: \'SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)\' )')
 parser.add_argument('-pf', '--past-frames', default=0, type=int, dest='past_frames',
-                    metavar='N', help='Number of past lidar frames provided to the network. (default: 0) Note: Option not valid for RNN')
+                    metavar='N', help='Number of past lidar frames provided to the network. (default: 0)')
 parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_stride',
                     metavar='N', help='Stride of past frames. Ex. past-frames=2 and frames-stride=2 where x is current frame'\
-                     '\n gives x, x-2, x-4. (default: 1) Note: Option not valid for RNN')
-parser.add_argument('-mpf','--manual_past_frames', default='', type=str, metavar='\'1 2 3\'',
+                     '\n gives x, x-2, x-4. (default: 1))
+parser.add_argument('-mpf','--manual_past_frames', default=None, type=str, metavar='\'1 2 3\'',
                     help = 'If not use past_frames and frames-stride, list which frames you want manually. Ex: \'1 3 5 7 10 13 16\'')
 
 #TODO: data_to_dict, dataset, main.
@@ -142,8 +142,8 @@ def main():
     super_train = {}
     super_test = {}
 
-    if manual_past_frames is not None:
-        args.manual_past_frames = range(1,args.frame_stride*args.past_frames+1, past_frames)
+    if args.manual_past_frames is None:
+        args.manual_past_frames = list(range(args.frame_stride,args.frame_stride*args.past_frames+1, args.frame_stride))
 
     if not args.evaluate:
         # Create a dictionary containing paths to data in all smaller data sets
@@ -214,6 +214,7 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
             train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
             times.update(epoch + 1, i + 1, step, time.time() - start_time)
+
             # Print statistics
             if step % args.print_freq == 0:
                 print_statistics(train_losses, times, len(dataloader_train))

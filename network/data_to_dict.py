@@ -13,7 +13,6 @@ def getData(path, past_frames, max=-1,):
     dic = {}
     indices = getIndices(path_topviews, max)
     dic['indices'] = indices #['%s_%i' %(path,i) for i in indices]
-
     #dic['lidar'] = [path+'input/topviews/max_elevation/me_%i.csv' %i for i in indices]  #path for lidar picture
 
     dic['lidar'] = getLidarFrames(path, indices, past_frames)
@@ -55,7 +54,7 @@ def getArray(path, h, w, header, indices, filename):
     res = np.zeros([max,h,w])
     idx = 0
     for i in indices:
-        if idx>=max:
+        if idx >= max:
             return res
         data = np.genfromtxt(path+filename+'%i.csv' %i, delimiter=',', skip_header=header)
         data = np.nan_to_num(data)
@@ -70,7 +69,7 @@ def getIndices(path, max):
     res = np.zeros([max])
     idx = 0
     for filename in os.listdir(path):
-        if idx>=max:
+        if idx >= max:
             return res
         data = int (re.search('\d+', filename).group())
         res[idx] = data
