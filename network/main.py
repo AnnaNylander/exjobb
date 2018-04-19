@@ -21,6 +21,10 @@ from result_meter import ResultMeter
 parser = argparse.ArgumentParser(description='PyTorch Drive a car wohoo')
 parser.add_argument('-a','--arch', default='', type=str, metavar='file.class',
                     help = 'Name of network to use. eg: LucaNetwork.LucaNet')
+parser.add_argument('--shuffle', dest='shuffle', action='store_true',
+                    help='Whether to shuffle training data or not. (default: False)')
+parser.add_argument('--no-intention', dest='no-intention', action='store_true',
+                    help='Set all intentions to 0. (default: False (aka keep intentions))')
 parser.add_argument('-b', '--batch-size', default=16, type=int,
                     metavar='N', help='mini-batch size (default: 16)')
 parser.add_argument('-e', '--epochs', default=10, type=int,
@@ -47,7 +51,7 @@ parser.add_argument('-pf', '--past-frames', default=0, type=int, dest='past_fram
                     metavar='N', help='Number of past lidar frames provided to the network. (default: 0)')
 parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_stride',
                     metavar='N', help='Stride of past frames. Ex. past-frames=2 and frames-stride=2 where x is current frame'\
-                     '\n gives x, x-2, x-4. (default: 1))
+                     '\n gives x, x-2, x-4. (default: 1)')
 parser.add_argument('-mpf','--manual_past_frames', default=None, type=str, metavar='\'1 2 3\'',
                     help = 'If not use past_frames and frames-stride, list which frames you want manually. Ex: \'1 3 5 7 10 13 16\'')
 
@@ -64,6 +68,13 @@ PIN_MEM = False
 
 if args.manual_past_frames:
     args.manual_past_frames = [int(i) for i in args.manual_past_frames.split(' ')]
+
+IS_LSTM = False
+IS_GRU = False
+if (args.arch == 'rnn.LSTMNet' or args.arch == 'rnn.LSTMNetBi'):
+    IS_LSTM = True
+if (args.arch == 'rnn.GRUNet'):
+    IS_GRU = True
 
 def main():
     # variables
@@ -161,10 +172,10 @@ def main():
             #super_validate.update(getData(subpath + 'validate/'))
             #super_train.update(getData(subpath + 'train/'))
 
-        validate_dataset = OurDataset(super_validate) #2000
-        train_dataset = OurDataset(super_train) #14000
+        validate_dataset = OurDataset(super_validate, args.no-intention) #2000
+        train_dataset = OurDataset(super_train, args.no-intention) #14000
         dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
-                        shuffle=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
+                        shuffle=args.shuffle, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
         dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
                         shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
 
@@ -177,7 +188,7 @@ def main():
             else:
                 super_test[key] = test_data[key]
 
-    test_dataset = OurDataset(super_test) #4000
+    test_dataset = OurDataset(super_test, args.no-intention) #4000
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
 
@@ -207,11 +218,21 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
     step = step_start
     for epoch in range(epoch_start, args.epochs):
         # Train for one epoch
+
+        #state (only used if RNN)
+        h_n = None
+        c_n = None
+
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()
 
             # Train model with current batch and save loss and duration
-            train_loss = train(model, batch, loss_fn, optimizer)
+            if IS_LSTM:
+                train_loss, h_n, c_n = train(model, batch, loss_fn, optimizer, h_n, c_n)
+            elif IS_GRU:
+                train_loss, h_n = train(model, batch, loss_fn, optimizer, h_n)
+            else:
+                train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
             times.update(epoch + 1, i + 1, step, time.time() - start_time)
 
@@ -241,6 +262,8 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     'epoch': epoch + 1,
                     'step' : step + 1,
                     'state_dict': model.state_dict(),
+                    'h_n': h_n,
+                    'c_n': c_n,
                     'best_res': best_res,
                     'optim' : args.optim,
                     'optimizer' : optimizer.state_dict(),
@@ -273,6 +296,8 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
             'epoch': epoch + 1,
             'step' : step + 1,
             'state_dict': model.state_dict(),
+            'h_n': h_n, #TODO serialize?
+            'c_n': c_n,
             'best_res': best_res,
             'optim' : args.optim,
             'optimizer' : optimizer.state_dict(),
@@ -291,7 +316,7 @@ def print_statistics(losses, times, batch_length):
           'Batch loss {losses.val:.4f} ({losses.avg:.4f})'.format( losses.epoch,
            losses.batch, batch_length, batch_time=times, losses=losses))
 
-def train(model, batch, loss_fn, optimizer):
+def train(model, batch, loss_fn, optimizer, h_n = None, c_n = None):
     model.train() # switch to train mode
 
     #lidars = numpy.asarray(batch['lidar'])
@@ -303,18 +328,30 @@ def train(model, batch, loss_fn, optimizer):
     values = values.view(-1, 30, 11)
     targets = targets.view(-1, 60)
 
-    output = model(lidars, values)
+    if IS_LSTM:
+        output, h_n, c_n = model(lidars, values, h_n, c_n)
+    elif IS_GRU:
+        output, h_n = model(lidars, values, h_n)
+    else:
+        output = model(lidars, values)
     loss = loss_fn(output, targets)
 
     optimizer.zero_grad() # reset gradients
     loss.backward()
     optimizer.step() # update weights
 
+    if IS_LSTM:
+        return loss.data[0], h_n, c_n
+    elif IS_GRU:
+        return loss.data[0], h_n
     return loss.data[0] # return loss for this batch
 
 def validate(model, dataloader, loss_fn, save_output=False):
     model.eval() # switch to eval mode
     losses = ResultMeter()
+
+    h_n = None
+    c_n = None
 
     for i, batch in enumerate(dataloader):
         # Read input and output into variables
@@ -329,7 +366,12 @@ def validate(model, dataloader, loss_fn, save_output=False):
         targets = targets.view(-1, 60)
 
         # Run model and calculate loss
-        output = model(lidars, values)
+            if h_n and c_n:
+                output, h_n, c_n = model(lidars, values, h_n, c_n)
+            elif h_n:
+                output, h_n = model(lidars, values, h_n)
+            else:
+                output = model(lidars, values)
         loss = loss_fn(output, targets)
 
         # Save generated predictions to file

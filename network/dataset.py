@@ -7,7 +7,7 @@ import torch
 
 class OurDataset(Dataset):
 
-    def __init__(self, dic, transform=None):
+    def __init__(self, dic, no-intention, transform=None):
 
         indices = dic.get('indices')
         self.indices = indices
@@ -21,6 +21,7 @@ class OurDataset(Dataset):
         outputs = dic.get('output')
         self.outputs = outputs
 
+        self.no-intention = no-intention
         self.transform = transform
 
     def __len__(self):
@@ -37,12 +38,17 @@ class OurDataset(Dataset):
         for l in self.lidars[idx]:
             temp = np.genfromtxt(l, delimiter=',')
             lidar.append(temp)
+
         values = np.genfromtxt(self.values[idx], delimiter=',', skip_header=True)
         values = np.nan_to_num(values)
+        if no-intention: # set all intentions to 0
+            values[:,(5,6)] = 0
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
+
         foldername = ''
         foldername_search= re.search('(?<=\/)\w*(?=\/(train|test|validate))', str(self.lidars[idx]))
         if foldername_search is not None:
             foldername = foldername_search.group()
+
         return {'indices': self.indices[idx], 'lidar': np.stack(lidar, axis=0), \
                 'value': values, 'output': output, 'foldername': foldername}

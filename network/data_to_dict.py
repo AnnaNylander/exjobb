@@ -70,7 +70,7 @@ def getIndices(path, max):
     idx = 0
     for filename in os.listdir(path):
         if idx >= max:
-            return res
+            return sorted(res)
         data = int (re.search('\d+', filename).group())
         res[idx] = data
         idx = idx + 1
