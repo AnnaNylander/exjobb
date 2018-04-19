@@ -23,7 +23,7 @@ class LSTMNet(nn.Module):
         bidirectional = False # If True, becomes a bidirectional LSTM
 
         # lidar encoder
-        self.conv_e0 = nn.Conv2d(30, 32, 3, padding=1)
+        self.conv_e0 = nn.Conv2d(1, 32, 3, padding=1)
 
         self.conv_e1 = nn.Conv2d(32, 32, 3, padding=1)
         self.maxpool_e1 = nn.MaxPool2d(2, stride=2)
@@ -51,13 +51,13 @@ class LSTMNet(nn.Module):
         self.conv_c12 = nn.Conv2d(96,64,3, padding=1, dilation=1)
 
         # decoder convolutions # 150 x 150 x 32
-        self.conv_d0 = nn.Conv2d(64,64,3, padding=1)
+        self.conv_d0 = nn.Conv2d(64,32,3, padding=1)
         self.maxpool_d0 = nn.MaxPool2d(3, stride=3)
 
-        self.conv_d1 = nn.Conv2d(64,32,3, padding=1)
+        self.conv_d1 = nn.Conv2d(32,16,3, padding=1)
         self.maxpool_d1 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_d2 = nn.Conv2d(32,30,3, padding=1)
+        self.conv_d2 = nn.Conv2d(16,1,3, padding=1)
 
         self.lstm_d3 = nn.LSTM(input_size=input_size,
                             hidden_size=hidden_size,
@@ -67,11 +67,12 @@ class LSTMNet(nn.Module):
 
         self.linear_d3 = nn.Linear(300,60)
 
+    def forward(self, l, v, h_0, c_0):
 
-    def forward(self, l, v):
-
-        # l is expected to be of shape [2, 30, 600, 600]
-        # v is expected to be of shape [2, 30, 11]
+        # l is expected to be of shape [2, 1, 600, 600]
+        # v is expected to be of shape [2, 1, 11]
+        # h_0 is expected to be of shape [2*1, 2, 300]
+        # c_0 is expected to be of shape [2*1, 2, 300]
 
         # encoder
         l = F.elu(self.conv_e0(l))                              # [2, 32, 600, 600]
@@ -99,41 +100,30 @@ class LSTMNet(nn.Module):
         l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
         l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
         l = F.elu(self.conv_c12(l))                             # [2, 64, 150, 150]
-        print_size(l,PRINT)
 
         # decoder convolutions
         l = F.elu(self.conv_d0(l))                              # [2, 64, 150, 150]
-        print_size(l,PRINT)
         l = self.maxpool_d0(l)                                  # [2, 64, 50, 50]
-        print_size(l,PRINT)
 
         l = F.elu(self.conv_d1(l))                              # [2, 32, 50, 50]
-        print_size(l,PRINT)
         l = self.maxpool_d1(l)                                  # [2, 32, 25, 25]
-        print_size(l,PRINT)
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
-        print_size(l,PRINT)
 
         l = l.view(l.size(0),30,-1)                                     # [2, 30, 625]
-        print_size(l,PRINT)
 
         # Construct lstm input vectors by concatenating the values to the lidar
+        v = v[0,:]
         e = torch.cat((l, v),2)                                 # [2, 30, 636]
-        print_size(e,PRINT)
 
         e = e.transpose(0,1)                                    # [30, 2, 636]
-        print_size(e, PRINT)
 
         # Feed input into lstm to get output.
         # Output y has shape (seq_len, batch, hidden_size * num_directions)
-        y, hn = self.lstm_d3(e)                                 # [30, 2, 300]
-        print_size(y,PRINT)
-
+        y, h_0, c_0 = self.lstm_d3(e,(h_0,c_0))                  # [30, 2, 300]
         y = self.linear_d3(y[-1])                               # [2, 60]
-        print_size(y,PRINT)
 
-        return y
+        return y, h_0, c_0
 
 class LSTMNetBi(nn.Module):
     ''' Using bidirectional LSTM cells '''
