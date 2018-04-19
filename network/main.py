@@ -48,6 +48,8 @@ parser.add_argument('-pf', '--past-frames', default=0, type=int, dest='past_fram
 parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_stride',
                     metavar='N', help='Stride of past frames. Ex. past-frames=2 and frames-stride=2 where x is current frame'\
                      '\n gives x, x-2, x-4. (default: 1) Note: Option not valid for RNN')
+parser.add_argument('-mpf','--manual_past_frames', default='', type=str, metavar='\'1 2 3\'',
+                    help = 'If not use past_frames and frames-stride, list which frames you want manually. Ex: \'1 3 5 7 10 13 16\'')
 
 #TODO: data_to_dict, dataset, main.
 # save, load,
@@ -59,6 +61,9 @@ PATH_SAVE = PATH_BASE + 'models/' + args.save_path
 PATH_DATA = PATH_BASE + 'dataset/' + args.dataset_path
 NUM_WORKERS = 3
 PIN_MEM = False
+
+if args.manual_past_frames:
+    args.manual_past_frames = [int(i) for i in args.manual_past_frames.split(' ')]
 
 def main():
     # variables
@@ -118,6 +123,7 @@ def main():
         print("\t Loading variables")
         args.past_frames = checkpoint['past_frames']
         args.frame_stride = checkpoint['frame_stride']
+        args.manual_past_frames = checkpoint['manual_past_frames'] if ('manual_past_frames' in checkpoint) else ''
         epoch_start = checkpoint['epoch']
         step_start = checkpoint['step']
         model.load_state_dict(checkpoint['state_dict'])
@@ -135,12 +141,16 @@ def main():
     super_validate = {}
     super_train = {}
     super_test = {}
+
+    if manual_past_frames is not None:
+        args.manual_past_frames = range(1,args.frame_stride*args.past_frames+1, past_frames)
+
     if not args.evaluate:
         # Create a dictionary containing paths to data in all smaller data sets
         for subdir in os.listdir(PATH_DATA):
             subpath = PATH_DATA + subdir + '/'
-            validation_data = getData(subpath + 'validate/', args.past_frames, args.frame_stride, max = 300)
-            train_data = getData(subpath + 'train/', args.past_frames, args.frame_stride)
+            validation_data = getData(subpath + 'validate/', args.manual_past_frames, max = 300)
+            train_data = getData(subpath + 'train/', args.manual_past_frames)
             for key in list(validation_data.keys()):
                 if key in super_validate:
                     super_validate[key] = numpy.concatenate((super_validate[key],validation_data[key]), axis=0)
@@ -160,7 +170,7 @@ def main():
 
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
-        test_data = getData(subpath + 'test/', args.past_frames, args.frame_stride)
+        test_data = getData(subpath + 'test/', args.manual_past_frames)
         for key in list(test_data.keys()):
             if key in super_test:
                 super_test[key] = numpy.concatenate((super_test[key], test_data[key]), axis=0)
@@ -226,6 +236,7 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     'arch' : args.arch,
                     'past_frames': args.past_frames,
                     'frame_stride': args.frame_stride,
+                    'manual_past_frames': args.manual_past_frames,
                     'epoch': epoch + 1,
                     'step' : step + 1,
                     'state_dict': model.state_dict(),
@@ -257,6 +268,7 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
             'arch' : args.arch,
             'past_frames': args.past_frames,
             'frame_stride': args.frame_stride,
+            'manual_past_frames': args.manual_past_frames,
             'epoch': epoch + 1,
             'step' : step + 1,
             'state_dict': model.state_dict(),

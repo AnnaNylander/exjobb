@@ -2,7 +2,7 @@ import os
 import re
 import numpy as np
 
-def getData(path, past_frames, frame_stride, max=-1,):
+def getData(path, past_frames, max=-1,):
     print("Loading: " + path)
     path_topviews = path + 'input/topviews/max_elevation/'
     path_values = path + 'input/values/'
@@ -16,7 +16,7 @@ def getData(path, past_frames, frame_stride, max=-1,):
 
     #dic['lidar'] = [path+'input/topviews/max_elevation/me_%i.csv' %i for i in indices]  #path for lidar picture
 
-    dic['lidar'] = getLidarFrames(path, indices, past_frames, frame_stride)
+    dic['lidar'] = getLidarFrames(path, indices, past_frames)
 
     dic['values'] = [path+'input/values/input_%i.csv' %i for i in indices]
     #dic['values'] = getArray(path_values, 30, 11, True, indices, 'input_')
@@ -24,7 +24,7 @@ def getData(path, past_frames, frame_stride, max=-1,):
     #dic['output'] = getArray(path_output, 30, 2, True, indices, 'output_')
     return dic
 
-def getLidarFrames(path, indices, past_frames, frame_stride):
+def getLidarFrames(path, indices, past_frames):
     res = []
     subdir = 'input/topviews/max_elevation/'
     base_path = re.search('.*(?=(train|validate|test)\/\Z)',path).group(0)
@@ -33,7 +33,8 @@ def getLidarFrames(path, indices, past_frames, frame_stride):
         frames = []
         frames.append(path+'input/topviews/max_elevation/me_%i.csv' %i) #main lidar picture. The current one.
         # past lidar pictures
-        for j in range(1,past_frames*frame_stride+1, frame_stride):
+        #for j in range(1,past_frames*frame_stride+1, frame_stride):
+        for j in past_frames:
             idx = i - j
             frame = ''
             while frame == '':
