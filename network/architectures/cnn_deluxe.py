@@ -126,91 +126,94 @@ class CNNOnly(nn.Module):
 
         # encoder
         l = F.elu(self.conv_e0(l))                              # [2, 8, 600, 600]
-        #print_size(l,PRINT)
+        #
 
         l = F.elu(self.conv_e1(l))                              # [2, 8, 600, 600]
-        #print_size(l,PRINT)
+        #
         l = self.maxpool_e1(l)                                  # [2, 8, 300, 300]
-        #print_size(l,PRINT)
+        #
 
         l = F.elu(self.conv_e2(l))                              # [2, 16, 300, 300]
-        #print_size(l,PRINT)
+        #
 
         l = F.elu(self.conv_e3(l))                              # [2, 16, 300, 300]
-        #print_size(l,PRINT)
+        #
         l = self.maxpool_e3(l)                                  # [2, 16, 150, 150]
-        #print_size(l,PRINT)
+        #
 
         v = expand_biases(v, 150, 150)                          # [2, 16, 150, 150]
-        print_size(l,PRINT)
+
         l = self.conv_e4(l)                                     # [2, 30, 150, 150]
-        print_size(l,PRINT)
+
         l = torch.add(l, 1, v)                                  # [2, 30, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(l))                      # [2, 30, 150, 150]
-        print_size(l,PRINT)
+
 
         #context module
         l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = F.elu(self.conv_c12(l))                             # [2, 30, 150, 150]
-        print_size(l,PRINT)
+
 
         # decoder convolutions
         l = F.elu(self.conv_d0(l))                              # [2, 30, 150, 150]
-        print_size(l,PRINT)
+
         l = self.maxpool_d0(l)                                  # [2, 30, 50, 50]
-        print_size(l,PRINT)
+
 
         l = F.elu(self.conv_d1(l))                              # [2, 30, 50, 50]
-        print_size(l,PRINT)
+
         l = self.maxpool_d1(l)                                  # [2, 30, 16, 16]
-        print_size(l,PRINT)
+
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 16, 16]
-        print_size(l,PRINT)
+
         l = self.maxpool_d2(l)
-        print_size(l,PRINT)                                     # [2, 30, 8, 8]
+                                             # [2, 30, 8, 8]
 
         l = F.elu(self.conv_d3(l))                              # [2, 30, 8, 8]
-        print_size(l,PRINT)
+
         l = self.maxpool_d3(l)
-        print_size(l,PRINT)                                     # [2, 30, 4, 4]
+                                             # [2, 30, 4, 4]
 
         l = F.elu(self.conv_d4(l))                              # [2, 30, 4, 4]
-        print_size(l,PRINT)
+
         l = self.maxpool_d4(l)
-        print_size(l,PRINT)                                     # [2, 30, 2, 2]
+                                             # [2, 30, 2, 2]
 
         l = F.elu(self.conv_d5(l))                              # [2, 30, 4, 2]
-        print_size(l,PRINT)
+
         l = self.maxpool_d5(l)
-        print_size(l,PRINT)                                     # [2, 30, 2, 1]
+                                             # [2, 30, 2, 1]
 
         l = l.squeeze()
-        print_size(l,PRINT)                                     # [2, 30, 2]
+                                             # [2, 30, 2]
+
+        l = l.view(-1,60)                                       # [2, 60]
+                                             # [2, 30
 
         return l
 
@@ -284,102 +287,98 @@ class CNNLSTM(nn.Module):
     def forward(self, l, v):
         # input
         v = v.transpose(0,1) # ensure v is 30x2x11 here         # [30, 2, 11]
-        print_size(v,PRINT)
 
         # (seq_len, batch, input_size)
         v, hn = self.lstm(v)                                    # [30, 2, 64]
-        print_size(v,PRINT)
 
         # Use only last output in the sequence produces
         v = v[-1]                                               # [2, 64]
-        print_size(v,PRINT)
 
         # encoder
         l = F.elu(self.conv_e0(l))                              # [2, 8, 600, 600]
-        print_size(l,PRINT)
 
         l = F.elu(self.conv_e1(l))                              # [2, 16, 600, 600]
-        print_size(l,PRINT)
+
         l = self.maxpool_e1(l)                                  # [2, 16, 300, 300]
-        print_size(l,PRINT)
+
 
         l = F.elu(self.conv_e2(l))                              # [2, 32, 300, 300]
-        print_size(l,PRINT)
+
 
         l = F.elu(self.conv_e3(l))                              # [2, 64, 300, 300]
-        print_size(l,PRINT)
+
         l = self.maxpool_e3(l)                                  # [2, 64, 150, 150]
-        print_size(l,PRINT)
+
 
         # v should have length=channels in l
         v = expand_biases(v, 150, 150)                          # [2, 64, 150, 150]
-        print_size(l,PRINT)
+
         l = torch.add(l, 1, v)                                  # [2, 64, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(l))                      # [2, 64, 150, 150]
-        print_size(l,PRINT)
+
 
         #context module
         l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
-        print_size(l,PRINT)
+
         l = F.elu(self.conv_c12(l))                             # [2, 30, 150, 150]
-        print_size(l,PRINT)
+
 
         # decoder convolutions
         l = F.elu(self.conv_d0(l))                              # [2, 30, 150, 150]
-        print_size(l,PRINT)
+
         l = self.maxpool_d0(l)                                  # [2, 30, 50, 50]
-        print_size(l,PRINT)
+
 
         l = F.elu(self.conv_d1(l))                              # [2, 30, 50, 50]
-        print_size(l,PRINT)
+
         l = self.maxpool_d1(l)                                  # [2, 30, 16, 16] TODO We are mising pixels here!
-        print_size(l,PRINT)
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 16, 16]
-        print_size(l,PRINT)
+
         l = self.maxpool_d2(l)
-        print_size(l,PRINT)                                     # [2, 30, 8, 8]
+                                             # [2, 30, 8, 8]
 
         l = F.elu(self.conv_d3(l))                              # [2, 30, 8, 8]
-        print_size(l,PRINT)
+
         l = self.maxpool_d3(l)
-        print_size(l,PRINT)                                     # [2, 30, 4, 4]
+                                             # [2, 30, 4, 4]
 
         l = F.elu(self.conv_d4(l))                              # [2, 30, 4, 4]
-        print_size(l,PRINT)
+
         l = self.maxpool_d4(l)
-        print_size(l,PRINT)                                     # [2, 30, 2, 2]
+                                             # [2, 30, 2, 2]
 
         l = F.elu(self.conv_d5(l))                              # [2, 30, 4, 2]
-        print_size(l,PRINT)
+
         l = self.maxpool_d5(l)
-        print_size(l,PRINT)                                     # [2, 30, 2, 1]
+                                             # [2, 30, 2, 1]
 
         l = l.squeeze()
-        print_size(l,PRINT)                                     # [2, 30, 2]
+                                             # [2, 30, 2]
+        l = l.view(-1,60)
 
         return l
 

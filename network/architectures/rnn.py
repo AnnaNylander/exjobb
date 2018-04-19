@@ -5,7 +5,7 @@ import torch.nn.modules.normalization as mm
 import numpy
 import torch
 
-PRINT = True
+PRINT = False
 
 ''' Processes lidar and values for each time step to produce a path.
 '''
@@ -115,7 +115,7 @@ class LSTMNet(nn.Module):
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
         print_size(l,PRINT)
 
-        l = l.view(2,30,-1)                                     # [2, 30, 625]
+        l = l.view(l.size(0),30,-1)                                     # [2, 30, 625]
         print_size(l,PRINT)
 
         # Construct lstm input vectors by concatenating the values to the lidar
@@ -234,7 +234,7 @@ class LSTMNetBi(nn.Module):
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
 
-        l = l.view(2,30,-1)                                     # [2, 30, 625]
+        l = l.view(l.size(0),30,-1)                                     # [2, 30, 625]
 
         # Construct lstm input vectors by concatenating the values to the lidar
         e = torch.cat((l, v),2)                                 # [2, 30, 636]
@@ -357,7 +357,7 @@ class GRUNet(nn.Module):
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
 
-        l = l.view(2,30,-1)                                     # [2, 30, 625]
+        l = l.view(l.size(0),30,-1)                                     # [2, 30, 625]
 
         # Construct lstm input vectors by concatenating the values to the lidar
         e = torch.cat((l, v),2)                                 # [2, 30, 636]
