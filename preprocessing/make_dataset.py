@@ -111,8 +111,8 @@ def get_input(measurements, intentions, traffic, frame, n_frames, n_steps):
     x, y, yaw = measurements[frame,[2, 3, 11]]
 
     for past_step in range(0,n_steps):
-        # Get index of past frames, i.e. exluding the current frame
-        frame_index = frame - past_step - 1
+        # Get index of past frames including the current frame
+        frame_index = frame - past_step
         # If requested frame is further into the past than frame 0, use 0
         frame_index = max(frame_index,0)
         # Calculate relative location, forward acceleration etc.
