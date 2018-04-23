@@ -23,7 +23,7 @@ parser.add_argument('-a','--arch', default='', type=str, metavar='file.class',
                     help = 'Name of network to use. eg: LucaNetwork.LucaNet')
 parser.add_argument('--shuffle', dest='shuffle', action='store_true',
                     help='Whether to shuffle training data or not. (default: False)')
-parser.add_argument('--no-intention', dest='no-intention', action='store_true',
+parser.add_argument('--no-intention', dest='no_intention', action='store_true',
                     help='Set all intentions to 0. (default: False (aka keep intentions))')
 parser.add_argument('-b', '--batch-size', default=16, type=int,
                     metavar='N', help='mini-batch size (default: 16)')
@@ -69,12 +69,6 @@ PIN_MEM = False
 if args.manual_past_frames:
     args.manual_past_frames = [int(i) for i in args.manual_past_frames.split(' ')]
 
-IS_LSTM = False
-IS_GRU = False
-if (args.arch == 'rnn.LSTMNet' or args.arch == 'rnn.LSTMNetBi'):
-    IS_LSTM = True
-if (args.arch == 'rnn.GRUNet'):
-    IS_GRU = True
 
 def main():
     # variables
@@ -160,8 +154,8 @@ def main():
         # Create a dictionary containing paths to data in all smaller data sets
         for subdir in os.listdir(PATH_DATA):
             subpath = PATH_DATA + subdir + '/'
-            validation_data = getData(subpath + 'validate/', args.manual_past_frames, max = 300)
-            train_data = getData(subpath + 'train/', args.manual_past_frames)
+            validation_data = getData(subpath + 'validate/', args.manual_past_frames, max = 10)
+            train_data = getData(subpath + 'train/', args.manual_past_frames, max = 10 )
             for key in list(validation_data.keys()):
                 if key in super_validate:
                     super_validate[key] = numpy.concatenate((super_validate[key],validation_data[key]), axis=0)
@@ -172,8 +166,8 @@ def main():
             #super_validate.update(getData(subpath + 'validate/'))
             #super_train.update(getData(subpath + 'train/'))
 
-        validate_dataset = OurDataset(super_validate, args.no-intention) #2000
-        train_dataset = OurDataset(super_train, args.no-intention) #14000
+        validate_dataset = OurDataset(super_validate, args.no_intention) #2000
+        train_dataset = OurDataset(super_train, args.no_intention) #14000
         dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
                         shuffle=args.shuffle, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
         dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
@@ -181,14 +175,14 @@ def main():
 
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
-        test_data = getData(subpath + 'test/', args.manual_past_frames)
+        test_data = getData(subpath + 'test/', args.manual_past_frames, max=10)
         for key in list(test_data.keys()):
             if key in super_test:
                 super_test[key] = numpy.concatenate((super_test[key], test_data[key]), axis=0)
             else:
                 super_test[key] = test_data[key]
 
-    test_dataset = OurDataset(super_test, args.no-intention) #4000
+    test_dataset = OurDataset(super_test, args.no_intention) #4000
     dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
                     shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
 
@@ -219,20 +213,11 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
     for epoch in range(epoch_start, args.epochs):
         # Train for one epoch
 
-        #state (only used if RNN)
-        h_n = None
-        c_n = None
-
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()
 
             # Train model with current batch and save loss and duration
-            if IS_LSTM:
-                train_loss, h_n, c_n = train(model, batch, loss_fn, optimizer, h_n, c_n)
-            elif IS_GRU:
-                train_loss, h_n = train(model, batch, loss_fn, optimizer, h_n)
-            else:
-                train_loss = train(model, batch, loss_fn, optimizer)
+            train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
             times.update(epoch + 1, i + 1, step, time.time() - start_time)
 
@@ -262,8 +247,6 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     'epoch': epoch + 1,
                     'step' : step + 1,
                     'state_dict': model.state_dict(),
-                    'h_n': h_n,
-                    'c_n': c_n,
                     'best_res': best_res,
                     'optim' : args.optim,
                     'optimizer' : optimizer.state_dict(),
@@ -296,8 +279,6 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
             'epoch': epoch + 1,
             'step' : step + 1,
             'state_dict': model.state_dict(),
-            'h_n': h_n, #TODO serialize?
-            'c_n': c_n,
             'best_res': best_res,
             'optim' : args.optim,
             'optimizer' : optimizer.state_dict(),
@@ -316,7 +297,7 @@ def print_statistics(losses, times, batch_length):
           'Batch loss {losses.val:.4f} ({losses.avg:.4f})'.format( losses.epoch,
            losses.batch, batch_length, batch_time=times, losses=losses))
 
-def train(model, batch, loss_fn, optimizer, h_n = None, c_n = None):
+def train(model, batch, loss_fn, optimizer):
     model.train() # switch to train mode
 
     #lidars = numpy.asarray(batch['lidar'])
@@ -328,30 +309,18 @@ def train(model, batch, loss_fn, optimizer, h_n = None, c_n = None):
     values = values.view(-1, 30, 11)
     targets = targets.view(-1, 60)
 
-    if IS_LSTM:
-        output, h_n, c_n = model(lidars, values, h_n, c_n)
-    elif IS_GRU:
-        output, h_n = model(lidars, values, h_n)
-    else:
-        output = model(lidars, values)
+    output = model(lidars, values)
     loss = loss_fn(output, targets)
 
     optimizer.zero_grad() # reset gradients
     loss.backward()
     optimizer.step() # update weights
 
-    if IS_LSTM:
-        return loss.data[0], h_n, c_n
-    elif IS_GRU:
-        return loss.data[0], h_n
     return loss.data[0] # return loss for this batch
 
 def validate(model, dataloader, loss_fn, save_output=False):
     model.eval() # switch to eval mode
     losses = ResultMeter()
-
-    h_n = None
-    c_n = None
 
     for i, batch in enumerate(dataloader):
         # Read input and output into variables
@@ -366,12 +335,7 @@ def validate(model, dataloader, loss_fn, save_output=False):
         targets = targets.view(-1, 60)
 
         # Run model and calculate loss
-            if h_n and c_n:
-                output, h_n, c_n = model(lidars, values, h_n, c_n)
-            elif h_n:
-                output, h_n = model(lidars, values, h_n)
-            else:
-                output = model(lidars, values)
+        output = model(lidars, values)
         loss = loss_fn(output, targets)
 
         # Save generated predictions to file
