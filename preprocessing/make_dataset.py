@@ -28,7 +28,7 @@ PATH_INPUT = PATH_SAVE + 'input/'
 PATH_OUTPUT =  PATH_SAVE + 'output/'
 
 N_STEPS_FUTURE = 30
-N_STEPS_PAST = 30
+N_STEPS_PAST = 30 # NOTE Including the current step
 PRECISION = '%.8f'
 DELIMITER = ','
 COMMENTS = ''

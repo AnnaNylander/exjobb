@@ -38,10 +38,10 @@ argparser.add_argument('--host', metavar='H', default='localhost',
                         help='IP of the host server (default: localhost)')
 argparser.add_argument('-p', '--port', metavar='P', default=2000, type=int,
                         help='TCP port to listen to (default: 2000)')
-#argparser.add_argument('-a', '--autopilot', action='store_true',
-#                        help='enable autopilot')
-#argparser.add_argument('-i', '--images-to-disk', action='store_true',
-#                        help='save images to disk')
+argparser.add_argument('-a', '--autopilot', action='store_true',
+                        help='enable autopilot')
+argparser.add_argument('-i', '--images-to-disk', action='store_true',
+                        help='save images to disk')
 argparser.add_argument('-c', '--carla-settings', metavar='PATH', default=None,
                         help='Path to a "CarlaSettings.ini" file')
 argparser.add_argument('-f', '--frames', default=100, type=int, dest='frames',
@@ -75,7 +75,7 @@ MOVING_AVERAGE_LENGTH = 10
 STEERING_MAX = 70 # angle in degrees
 
 
-def run_carla_client(host, port, autopilot_on, planner_path, save_images_to_disk, image_filename_format, settings_filepath):
+def run_carla_client(host, port, save_images_to_disk, image_filename_format, settings_filepath):
 
     with make_carla_client(host, port) as client:
         print('CarlaClient connected')

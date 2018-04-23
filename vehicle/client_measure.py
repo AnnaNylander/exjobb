@@ -11,6 +11,7 @@
 from __future__ import print_function
 
 import argparse
+import random
 import logging
 import random
 import time
@@ -18,6 +19,7 @@ import math
 import numpy as np
 
 from carla.client import make_carla_client
+import save_util as saver
 from carla.sensor import Camera, Lidar
 from carla.settings import CarlaSettings
 from carla.tcp import TCPConnectionError
@@ -27,16 +29,19 @@ THROTTLE_INC = 0.1
 
 def run_carla_client(args):
 
-    number_of_episodes = 10
-    frames_per_episode = 50*10
+    number_of_total_frames = 0
+    frames_per_episode = 1800
+    max_total_frames = 36000
+    episode = 0
 
     with make_carla_client(args.host, args.port) as client:
         print('client connected')
 
         throttle = 0.0
 
-        for episode in range(0, number_of_episodes):
-
+        #for episode in range(0, number_of_episodes):
+        while number_of_total_frames < max_total_frames:
+            episode += 1
             throttle += THROTTLE_INC
 
             settings = CarlaSettings()
@@ -56,23 +61,26 @@ def run_carla_client(args):
 
             scene = client.load_settings(settings)
             number_of_player_starts = len(scene.player_start_spots)
-            player_start = 2 #random.randint(0, max(0, number_of_player_starts - 1))
-
+            player_start = random.randint(0, max(0, number_of_player_starts - 1))
+            #2, 34
             print('Starting new episode...')
             client.start_episode(player_start)
 
             # Create matrix for holding time, acceleration and throttle, velocity
-            values = np.zeros([frames_per_episode,8])
+            values = np.zeros([1,22])
 
+            i = 0
+            choose = 1
             # Iterate every frame in the episode.
             for frame in range(0, frames_per_episode):
 
                 # Read the data produced by the server this frame.
                 measurements, sensor_data = client.read_data()
+                control = measurements.player_measurements.autopilot_control
+                pm = saver.get_player_measurements(measurements)
+                #time, acc, v, yaw,x,y,z = get_values(measurements)
+                #values[frame,:] = [time, acc, throttle, v, yaw,x,y,z]
 
-                # Get time and acceleration
-                time, acc, v, yaw,x,y,z = get_values(measurements)
-                values[frame,:] = [time, acc, throttle, v, yaw,x,y,z]
 
                 # Print some of the measurements.
                 #print_measurements(measurements)
@@ -83,16 +91,47 @@ def run_carla_client(args):
                         filename = args.out_filename_format.format(episode, name, frame)
                         measurement.save_to_disk(filename)
 
-                control = measurements.player_measurements.autopilot_control
-                control.throttle = throttle
-                control.brake = 0
+                if frame % 30 == 0:
+                    rand = random.random()
+                #    print(x)
+                    choose = random.random()
+
+                if choose > 0.3:
+                    # accelerate
+                    control.throttle = rand
+                    control.brake = 0.0
+                else:
+                    # break
+                    control.brake = rand
+                    control.throttle = 0.0
+
+
+                # override values
+                pm[17] = control.steer
+                pm[18] = control.throttle
+                pm[19] = control.brake
+                pm[20] = control.hand_brake
+                pm[21] = control.reverse
+
                 client.send_control(control)
-                time.sleep( 500)
+
+                #values[frame,:] = [time, acc, control.throttle, v, yaw,x,y,z]
+                #pm = np.array([time, acc, control.throttle, control.brake, v, yaw, x, y, z])
+                pm = np.expand_dims(pm,axis=1).transpose()
+                #print((pm.shape))
+                values = np.concatenate([values, pm], axis=0)
+
+                is_colliding = measurements.player_measurements.collision_other > 0.0
+
+                if is_colliding: break
+                number_of_total_frames += 1
 
             # Save measured values
-            filename = '/home/annaochjacob/Repos/carla/PythonClient/throttle_measurements/throttle_%.2f.csv' % throttle
-            header = 'time,acceleration,throttle,velocity,yaw,x,y,z'
-            np.savetxt(filename, values, delimiter=',', comments='', fmt='%.4f')
+            filename = '/media/annaochjacob/crucial/recorded_data/carla/OTHER2/player_measurements/episode_%i.csv' % episode
+            #header = 'time,acceleration,throttle,brake,velocity,yaw,x,y,z'
+            header = saver.get_player_measurements_header()
+            values = values[1:,:]
+            np.savetxt(filename, values, delimiter=',', comments='', fmt='%.4f', header=header)
 
 
 def print_measurements(measurements):
@@ -121,13 +160,11 @@ def get_values(measurements):
     acc_y = player_measurements.acceleration.y
     acc_z = player_measurements.acceleration.z
     acceleration = math.sqrt(acc_x**2 + acc_y**2)# + acc_z**2)
-    yaw = player_measurements.player.transform.rotation.yaw
-    x = player_measurements.player.tranform.location.x
-    y = player_measurements.player.tranform.location.y
-    z = player_measurements.player.tranform.location.z
-    print('x,y,z')
-    print(x,y,z)
-    velocity = player_measurements.player.forward_speed
+    yaw = player_measurements.transform.rotation.yaw
+    x = player_measurements.transform.location.x
+    y = player_measurements.transform.location.y
+    z = player_measurements.transform.location.z
+    velocity = player_measurements.forward_speed
     time = measurements.game_timestamp
     return time, acceleration, velocity, yaw,x,y,z
 
