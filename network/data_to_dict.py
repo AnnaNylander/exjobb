@@ -12,27 +12,23 @@ def getData(path, past_frames, max=-1,):
 
     dic = {}
     indices = getIndices(path_topviews, max)
-    dic['indices'] = indices #['%s_%i' %(path,i) for i in indices]
-    #dic['lidar'] = [path+'input/topviews/max_elevation/me_%i.csv' %i for i in indices]  #path for lidar picture
-
+    dic['indices'] = indices
     dic['lidar'] = getLidarFrames(path, indices, past_frames)
-
     dic['values'] = [path+'input/values/input_%i.csv' %i for i in indices]
-    #dic['values'] = getArray(path_values, 30, 11, True, indices, 'input_')
     dic['output'] = [path+'output/output_%i.csv' %i for i in indices]
-    #dic['output'] = getArray(path_output, 30, 2, True, indices, 'output_')
+
     return dic
 
 def getLidarFrames(path, indices, past_frames):
     res = []
     subdir = 'input/topviews/max_elevation/'
-    base_path = re.search('.*(?=(train|validate|test)\/\Z)',path).group(0)
+    categories = 'straight|left|right|right_intention|left_intention|traffic_light|other'
+    base_path = re.search('.*(?=(' + categories + ')\/\Z)',path).group(0)
     folders = ['train/', 'validate/', 'test/']
     for i in indices:
         frames = []
         frames.append(path+'input/topviews/max_elevation/me_%i.csv' %i) #main lidar picture. The current one.
         # past lidar pictures
-        #for j in range(1,past_frames*frame_stride+1, frame_stride):
         for j in past_frames:
             idx = i - j
             frame = ''
@@ -77,3 +73,65 @@ def getIndices(path, max):
         #if(idx%100==0):
         #    print('\tindex: %i of max %i, filetotal is %i' %(idx, max, nr_of_files) )
     return res
+
+def get_sampled_data(data_path, step_dict, max_limit=None):
+    '''Creates a dictionary of sampled data, where step_dict is a dictionary
+    from category to step size, e.g. {'left':2} to keep every other frame in
+    category 'left'. Parameter max_limit tells how many indices to keep in each
+    category. The first max_limit frames will be used. If there are less than
+    max_limit,only the frames available are used, i.e. no resampling.
+
+    Example of step_dict:
+    1 means keep every, 2 means keep every other, and so on...
+    0 means do not add any from this category
+
+    step_dict = {'straight' : 1,
+                 'left' : 1,
+                 'right' : 1,
+                 'right_intention' : 1,
+                 'left_intention' : 1,
+                 'traffic_light' : 1,
+                 'other' : 0
+                 }
+    '''
+
+    sampled_data = {}
+
+    # for each category in banana
+    for category in step_dict.keys():
+
+        # Data has the following structure:
+        # key in indices, values, lidars, output
+        cat_data = getData(data_path + category + '/', [], max=-1)
+
+        # Get the number of frames in this category
+        n_frames = len(cat_data['indices'])
+
+        # Get the stepsize for this category
+        step = step_dict[category]
+
+        # Create array which tells what frames to keep
+        if step != 0:
+            asorted_indices = cat_data['indices']
+
+            # Pick out the indices to keep from inputs, lidar, values and output
+            for key, value in cat_data.items():
+
+                # Sort indices, lidar, values and output based on indices
+                value = [x for _,x in sorted(zip(asorted_indices, value))]
+
+                # Keep every 'step'th element
+                data_to_keep = value[0::step]
+
+                # Cap length of data list if longer than max_limit
+                if max_limit is not None and len(data_to_keep) > max_limit:
+                    data_to_keep = data_to_keep[0:max_limit]
+                    print(len(data_to_keep))
+
+                # Append current data to all previously sampled data
+                if key in sampled_data:
+                    data_to_keep = np.concatenate((sampled_data[key], data_to_keep), axis=0)
+
+                sampled_data[key] = data_to_keep
+
+    return sampled_data
