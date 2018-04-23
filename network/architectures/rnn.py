@@ -16,11 +16,13 @@ class LSTMNet(nn.Module):
         super(LSTMNet, self).__init__()
 
         # LSTM architecture definitions
-        input_size = 636 # The number of expected features in the input x
-        hidden_size = 300 # The number of features in the hidden state h
-        num_layers = 2 # Number of recurrent layers
-        dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
-        bidirectional = False # If True, becomes a bidirectional LSTM
+        self.input_size = 636 # The number of expected features in the input x
+        self.hidden_size = 300 # The number of features in the hidden state h
+        self.num_layers = 2 # Number of recurrent layers
+        self.dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
+        self.bidirectional = False # If True, becomes a bidirectional LSTM
+        self.h_0 = None
+        self.c_0 = None
 
         # lidar encoder
         self.conv_e0 = nn.Conv2d(1, 32, 3, padding=1)
@@ -59,15 +61,15 @@ class LSTMNet(nn.Module):
 
         self.conv_d2 = nn.Conv2d(16,1,3, padding=1)
 
-        self.lstm_d3 = nn.LSTM(input_size=input_size,
-                            hidden_size=hidden_size,
-                            num_layers=num_layers,
-                            dropout=dropout,
-                            bidirectional=bidirectional)
+        self.lstm_d3 = nn.LSTM(input_size=self.input_size,
+                            hidden_size=self.hidden_size,
+                            num_layers=self.num_layers,
+                            dropout=self.dropout,
+                            bidirectional=self.bidirectional)
 
         self.linear_d3 = nn.Linear(300,60)
 
-    def forward(self, l, v, h_0, c_0):
+    def forward(self, l, v):
 
         # l is expected to be of shape [2, 1, 600, 600]
         # v is expected to be of shape [2, 1, 11]
@@ -110,20 +112,30 @@ class LSTMNet(nn.Module):
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
 
-        l = l.view(l.size(0),30,-1)                                     # [2, 30, 625]
+        l = l.view(l.size(0),1,-1)                                     # [2, 30, 625]
 
         # Construct lstm input vectors by concatenating the values to the lidar
-        v = v[0,:]
+        v = v[:,0,:]
+        v = v.unsqueeze(1)
         e = torch.cat((l, v),2)                                 # [2, 30, 636]
 
         e = e.transpose(0,1)                                    # [30, 2, 636]
 
         # Feed input into lstm to get output.
         # Output y has shape (seq_len, batch, hidden_size * num_directions)
-        y, h_0, c_0 = self.lstm_d3(e,(h_0,c_0))                  # [30, 2, 300]
-        y = self.linear_d3(y[-1])                               # [2, 60]
+        if self.h_0 is None:
+            self.h_0 = Variable(torch.zeros(self.num_layers, l.size(0), self.hidden_size).cuda())
+            self.c_0 = Variable(torch.zeros(self.num_layers, l.size(0), self.hidden_size).cuda())
 
-        return y, h_0, c_0
+        y, (self.h_0, self.c_0) = self.lstm_d3(e, (self.h_0, self.c_0))                  # [30, 2, 300]'
+        print('HEHEHEHEJ')
+        print_size(y,True)
+        print_size(self.h_0, True)
+        print_size(self.c_0, True)
+        y = self.linear_d3(y[-1])                               # [2, 60]
+        print(type(y))
+
+        return y
 
 class LSTMNetBi(nn.Module):
     ''' Using bidirectional LSTM cells '''
