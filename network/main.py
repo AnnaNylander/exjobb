@@ -13,6 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 from architectures import *
 from data_to_dict import getData
 from dataset import OurDataset
+from scheduler import Scheduler
 #from architectures.network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
 from result_meter import ResultMeter
 
@@ -37,6 +38,8 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='Name of folder in /media/annaochjacob/crucial/models/ ex \'SmallerNetwork1/checkpoint.pt\' ')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
+parser.add_argument('--scheduler', dest='scheduler', action='store_true',
+                    help='Whether to manually adjust learning rate as we train. (https://sgugger.github.io/the-1cycle-policy.html)')
 parser.add_argument('-d','--dataset', dest='dataset_path', default='',
                     type=str, metavar='PATH',
                     help = 'Name of folder in /media/annaochjacob/crucial/dataset/ ex \'Banana_split/\' (with trailing /)')
@@ -69,21 +72,24 @@ PIN_MEM = False
 if args.manual_past_frames:
     args.manual_past_frames = [int(i) for i in args.manual_past_frames.split(' ')]
 
+# TODO do some regex or something.
+learning_rate = 1e-5
+momentum = 0.9
 
 def main():
     # variables
-    best_res = 10000 #big number
-
-    #learning_rate = 1e-5 #Not used with args.optim
+    best_res = 1000000 #big number
     epoch_start = 0
     step_start = 0
     train_losses = ResultMeter()
     validation_losses = ResultMeter()
     times = ResultMeter()
+    lr_scheduler = Scheduler('lr')
+    momentum_scheduler = Scheduler('momentum')
 
     # load all time best
     print("-----Load all time best loss (for comparision)-----")
-    all_time_best_res = 10000 # big number
+    all_time_best_res = 1000000 # big number
     all_time_best = load_checkpoint( PATH_SAVE + 'all_time_best.pt')
     if all_time_best is not None:
         all_time_best_res = all_time_best['best_res']
@@ -100,9 +106,11 @@ def main():
         # define loss function and optimizer
         print("-----Creating lossfunction and optimizer-----")
         loss_fn = torch.nn.MSELoss().cuda()
-        #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
-        #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
         optimizer = eval('torch.optim.' + args.optim)
+        if args.scheduler:
+            #TODO max_steps should be lenght of dataloaders?
+            lr_scheduler = Scheduler('lr',max_steps = 1000, start_val=learning_rate/10, center_val = learning_rate)
+            momentum_scheduler = Scheduler('momentum', max_steps = 1000, start_val=momentum, center_val = momentum-0.1)
 
     #resume from checkpoint
     if args.resume:
@@ -122,7 +130,9 @@ def main():
         args.optim = checkpoint['optim']
         loss_fn = torch.nn.MSELoss().cuda()
         optimizer = eval('torch.optim.' + args.optim)
-        #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+        if args.scheduler:
+            lr_scheduler = Scheduler()
+            momentum_scheduler = Scheduler()
 
         #load variables
         print("\t Loading variables")
@@ -134,73 +144,63 @@ def main():
         model.load_state_dict(checkpoint['state_dict'])
         best_res = checkpoint['best_res']
         optimizer.load_state_dict(checkpoint['optimizer'])
+        lr_scheduler.deserialize(checkpoint['lr_scheduler'])
+        momentum_scheduler.deserialize(checkpoint['momentum_scheduler'])
         train_losses.deserialize(checkpoint['train_losses'])
         validation_losses.deserialize(checkpoint['validation_losses'])
         times.deserialize(checkpoint['times'])
+
+        # init scheduler after we have loaded the optimizer
+        #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer)
+        #scheduler.load_state_dict(checkpoint['scheduler'])
 
         del checkpoint
         print("Loaded checkpoint sucessfully")
 
     # Load datasets
     print("-----Loading datasets-----")
-    super_validate = {}
-    super_train = {}
-    super_test = {}
-
-    if args.manual_past_frames is None:
-        args.manual_past_frames = list(range(args.frame_stride,args.frame_stride*args.past_frames+1, args.frame_stride))
-
     if not args.evaluate:
-        # Create a dictionary containing paths to data in all smaller data sets
-        for subdir in os.listdir(PATH_DATA):
-            subpath = PATH_DATA + subdir + '/'
-            validation_data = getData(subpath + 'validate/', args.manual_past_frames, max = 10)
-            train_data = getData(subpath + 'train/', args.manual_past_frames, max = 10 )
-            for key in list(validation_data.keys()):
-                if key in super_validate:
-                    super_validate[key] = numpy.concatenate((super_validate[key],validation_data[key]), axis=0)
-                    super_train[key] = numpy.concatenate((super_train[key], train_data[key]), axis=0)
-                else:
-                    super_validate[key] = validation_data[key]
-                    super_train[key] = train_data[key]
-            #super_validate.update(getData(subpath + 'validate/'))
-            #super_train.update(getData(subpath + 'train/'))
-
-        validate_dataset = OurDataset(super_validate, args.no_intention) #2000
-        train_dataset = OurDataset(super_train, args.no_intention) #14000
-        dataloader_train = DataLoader(train_dataset, batch_size=args.batch_size,
-                        shuffle=args.shuffle, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
-        dataloader_val = DataLoader(validate_dataset, batch_size=args.batch_size,
-                        shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
-
-    for subdir in os.listdir(PATH_DATA):
-        subpath = PATH_DATA + subdir + '/'
-        test_data = getData(subpath + 'test/', args.manual_past_frames, max=10)
-        for key in list(test_data.keys()):
-            if key in super_test:
-                super_test[key] = numpy.concatenate((super_test[key], test_data[key]), axis=0)
-            else:
-                super_test[key] = test_data[key]
-
-    test_dataset = OurDataset(super_test, args.no_intention) #4000
-    dataloader_test = DataLoader(test_dataset, batch_size=args.batch_size,
-                    shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
+        dataloader_train = getDataloader( foldername = 'train/', max = 100, shuffle = True)
+        dataloader_val = getDataloader(foldername = 'validate/', max = 10, shuffle = False)
+    dataloader_test = getDataloader(foldername = 'test/', max = 10, shuffle = False)
 
     # Train network
     if not args.evaluate:
         print("______TRAIN MODEL_______")
         if not os.path.exists(PATH_SAVE):
                 os.makedirs(PATH_SAVE)
-        main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
-                    validation_losses, times, dataloader_train, dataloader_val,
-                    best_res, all_time_best_res)
+        main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
+                    momentum_scheduler, loss_fn, train_losses, validation_losses,
+                    times, dataloader_train, dataloader_val, best_res, all_time_best_res)
 
     # Final evaluation on test dataset
     print("_____EVALUATE MODEL______")
     test_loss = validate(model, dataloader_test, loss_fn, True)
     print("Test loss: %f" %test_loss)
 
-def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
+def getDataloader(foldername = 'train/', max = -1, shuffle = False):
+    super_data = {}
+
+    if args.manual_past_frames is None:
+        args.manual_past_frames = list(range(args.frame_stride,args.frame_stride*args.past_frames+1, args.frame_stride))
+
+    for subdir in os.listdir(PATH_DATA):
+        subpath = PATH_DATA + subdir + '/'
+        data = getData(subpath + foldername, args.manual_past_frames, max=max)
+        for key in list(data.keys()):
+            if key in super_data:
+                super_data[key] = numpy.concatenate((super_data[key], data[key]), axis=0)
+            else:
+                super_data[key] = data[key]
+
+    dataset = OurDataset(super_data, args.no_intention) #4000
+    dataloader = DataLoader(dataset, batch_size=args.batch_size,
+                    shuffle=shuffle, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
+    return dataloader
+
+
+def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
+                momentum_scheduler, loss_fn, train_losses,
                 validation_losses, times, dataloader_train, dataloader_val,
                 best_res, all_time_best_res):
 
@@ -216,10 +216,23 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()
 
+            # Normally on would have the scheduler step in the epochs loop,
+            # but we want a smooth step change as described in
+            # https://sgugger.github.io/the-1cycle-policy.html and instead take
+            # a (really small) step() after each iteration.
+            #if args.scheduler:
+            #    scheduler.step()
+            #    #TODO not use scheduler not supersmall lr.
+
             # Train model with current batch and save loss and duration
             train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
             times.update(epoch + 1, i + 1, step, time.time() - start_time)
+
+            #Update learning rate and momentum
+            if args.scheduler:
+                lr_scheduler.update(optimizer, step)
+                momentum_scheduler.update(optimizer, step)
 
             # Print statistics
             if step % args.print_freq == 0:
@@ -250,6 +263,8 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
                     'best_res': best_res,
                     'optim' : args.optim,
                     'optimizer' : optimizer.state_dict(),
+                    'lr_scheduler' : lr_scheduler.serialize(),
+                    'momentum_scheduler' : momentum_scheduler.serialize(),
                     'train_losses' : train_losses.serialize(),
                     'validation_losses' : validation_losses.serialize(),
                     'times' : times.serialize()
@@ -282,6 +297,8 @@ def main_loop(epoch_start, step_start, model, optimizer, loss_fn, train_losses,
             'best_res': best_res,
             'optim' : args.optim,
             'optimizer' : optimizer.state_dict(),
+            'lr_scheduler' : lr_scheduler.serialize(),
+            'momentum_scheduler' : momentum_scheduler.serialize(),
             'train_losses' : train_losses.serialize(),
             'validation_losses' : validation_losses.serialize(),
             'times' : times.serialize()
