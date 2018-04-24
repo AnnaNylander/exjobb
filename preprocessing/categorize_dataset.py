@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(description='Split data into categories')
 
 parser.add_argument('-a','--annotations', metavar='path',
                     dest='annotations_path', default='dataset/',
-                    help='Path to file which includes annotations ex \'recorded_data/banana/banana.csv\'')
+                    help='Path to file which includes annotations ex \'banana/banana.csv\'')
 parser.add_argument('-s','--save-path', metavar='path',
                     dest='save_path', default='dataset/',
                     help='Foldername in /media/annaochjacob/crucial/dataset/ ex \'banana_split/\' (with trailing /)')
@@ -29,13 +29,12 @@ parser.add_argument('-c','--copy', action='store_true',
 args = parser.parse_args()
 
 PATH_BASE = '/media/annaochjacob/crucial/'
-PATH_BASE = '/Users/Jacob/Documents/Datasets/'
 
-PATH_SAVE = PATH_BASE + args.save_path
-PATH_DATA = PATH_BASE + args.data_path
-ANNOTATION_PATH = PATH_BASE + args.annotations_path
+PATH_SAVE = PATH_BASE + 'dataset/' + args.save_path
+PATH_DATA = PATH_BASE + 'dataset/' + args.data_path
+ANNOTATION_PATH = PATH_BASE  + 'recorded_data/carla/'+ args.annotations_path
 
-CATEGORIES = {'s' : 'straight',
+CATEGORIES = {'s': 'straight',
              'ri': 'right_intention',
              'li': 'left_intention',
              'r' : 'right',
@@ -44,9 +43,6 @@ CATEGORIES = {'s' : 'straight',
              't' : 'traffic_light'}
 
 def main():
-
-    make_fake_set(PATH_BASE + 'fruit_salad/jacob_split/')
-
     # Create directories to move/copy into
     for key, name in CATEGORIES.items():
         make_dir(PATH_SAVE + '%s/input/values/' %name)

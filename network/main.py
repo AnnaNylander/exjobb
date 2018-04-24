@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 
 from architectures import *
-from data_to_dict import getData
+from data_to_dict import getData, get_sampled_data
 from dataset import OurDataset
 from scheduler import Scheduler
 #from architectures.network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
@@ -180,9 +180,18 @@ def getDataloader(foldername = 'train/', max = -1, shuffle = False):
     if args.manual_past_frames is None:
         args.manual_past_frames = list(range(args.frame_stride,args.frame_stride*args.past_frames+1, args.frame_stride))
 
+    step_dict = {'straight' : 1,
+                 'left' : 1,
+                 'right' : 1,
+                 'right_intention' : 1,
+                 'left_intention' : 1,
+                 'traffic_light' : 1,
+                 'other' : 0}
+
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
-        data = getData(subpath + foldername, args.manual_past_frames, max=max)
+        data = get_sampled_data(subpath, args.manual_past_frames, step_dict, max_limit=max)
+
         for key in list(data.keys()):
             if key in super_data:
                 super_data[key] = numpy.concatenate((super_data[key], data[key]), axis=0)
@@ -192,6 +201,7 @@ def getDataloader(foldername = 'train/', max = -1, shuffle = False):
     dataset = OurDataset(super_data, args.no_intention) #4000
     dataloader = DataLoader(dataset, batch_size=args.batch_size,
                     shuffle=shuffle, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
+
     return dataloader
 
 
@@ -208,6 +218,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
     step = step_start
     for epoch in range(epoch_start, args.epochs):
         # Train for one epoch
+        print(len(dataloader_train))
 
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()

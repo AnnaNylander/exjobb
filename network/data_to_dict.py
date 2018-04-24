@@ -74,7 +74,7 @@ def getIndices(path, max):
         #    print('\tindex: %i of max %i, filetotal is %i' %(idx, max, nr_of_files) )
     return res
 
-def get_sampled_data(data_path, step_dict, max_limit=None):
+def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
     '''Creates a dictionary of sampled data, where step_dict is a dictionary
     from category to step size, e.g. {'left':2} to keep every other frame in
     category 'left'. Parameter max_limit tells how many indices to keep in each
@@ -102,7 +102,7 @@ def get_sampled_data(data_path, step_dict, max_limit=None):
 
         # Data has the following structure:
         # key in indices, values, lidars, output
-        cat_data = getData(data_path + category + '/', [], max=-1)
+        cat_data = getData(data_path + category + '/', [])
 
         # Get the number of frames in this category
         n_frames = len(cat_data['indices'])
@@ -110,8 +110,11 @@ def get_sampled_data(data_path, step_dict, max_limit=None):
         # Get the stepsize for this category
         step = step_dict[category]
 
-        # Create array which tells what frames to keep
-        if step != 0:
+        # Check for empy categories
+        is_empty_category = len(cat_data['indices']) == 0
+
+        # If there is a non-zero step size, pick out the frames
+        if step != 0 and not is_empty_category:
             asorted_indices = cat_data['indices']
 
             # Pick out the indices to keep from inputs, lidar, values and output
@@ -126,7 +129,6 @@ def get_sampled_data(data_path, step_dict, max_limit=None):
                 # Cap length of data list if longer than max_limit
                 if max_limit is not None and len(data_to_keep) > max_limit:
                     data_to_keep = data_to_keep[0:max_limit]
-                    print(len(data_to_keep))
 
                 # Append current data to all previously sampled data
                 if key in sampled_data:
