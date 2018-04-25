@@ -1,3 +1,6 @@
 [submodule "control_module/MPC_drive"]
 	path = control_module/MPC_drive
 	url = https://github.com/JulianoLagana/MPC_drive.git
+[submodule "carla"]
+	path = carla
+	url = https://github.com/JacobGenander/carla.git
