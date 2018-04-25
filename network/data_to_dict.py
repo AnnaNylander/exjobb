@@ -22,30 +22,24 @@ def getData(path, past_frames, max=-1,):
 def getLidarFrames(path, indices, past_frames):
     res = []
     subdir = 'input/topviews/max_elevation/'
-    categories = 'straight|left|right|right_intention|left_intention|traffic_light|other'
-    base_path = re.search('.*(?=(' + categories + ')\/\Z)',path).group(0)
-    #folders = ['train/', 'validate/', 'test/']
-    folders = ['straight/','left/','right/','right_intention/','left_intention/','traffic_light','other/']
-
-    print(indices)
+    folders = [string + '/' for string in os.listdir(path + '..')] #['straight/','left/','right/','right_intention/','left_intention/','traffic_light/','other/']
+    base_path = re.search('.*(?=(' + '|'.join(os.listdir(path+'..')) + ')\/\Z)',path).group(0)
 
     for i in indices:
         frames = []
         frames.append(path+'input/topviews/max_elevation/me_%i.csv' %i) #main lidar picture. The current one.
-        # past lidar pictures
         for j in past_frames:
             idx = i - j
             frame = ''
-            while frame == '': #TODO only go through all frames once, not forever
+            while frame == '' and idx <= i: #TODO only go through all frames once, not forever
                 for folder in folders:
                     filename = base_path + folder + 'input/topviews/max_elevation/me_%i.csv' %idx
                     if os.path.isfile(filename):
-			print('Found', filename)
                         frame = filename
-		    else:
-			print('No ', filename)
-
+                        break
                 idx += 1
+            if frame=='':
+                print("WARNING: Not found " + frame)
             frames.append(frame)
         res.append(frames)
     return res
@@ -110,7 +104,6 @@ def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
 
     # for each category in banana
     for category in step_dict.keys():
-        print(past_frames)
 
         # Data has the following structure:
         # key in indices, values, lidars, output

@@ -160,6 +160,16 @@ def main():
         del checkpoint
         print("Loaded checkpoint sucessfully")
 
+<<<<<<< 54143074dd4d860e56e6bcad470cca129d6f4b36
+=======
+    # Load datasets
+    print("-----Loading datasets-----")
+    if not args.evaluate:
+        dataloader_train = getDataloader( foldername = 'train/', max = 100, shuffle = True)
+        dataloader_val = getDataloader(foldername = 'validate/', max = 10, shuffle = False)
+    dataloader_test = getDataloader(foldername = 'test/', max = 10, shuffle = False)
+
+>>>>>>> Fixed RNN nets to load more time steps
     # Train network
     if not args.evaluate:
         print("______TRAIN MODEL_______")
@@ -182,7 +192,7 @@ def getDataloader(foldername = 'train/', max = -1, shuffle = False):
                                              args.frame_stride*args.past_frames+1,
                                              args.frame_stride))
 
-    print('MANUAL PAST FRAMES:', args.manual_past_frames)
+    #print('MANUAL PAST FRAMES:', args.manual_past_frames)
 
     step_dict = {'straight' : 50,
                  'left' : 2,
@@ -195,8 +205,6 @@ def getDataloader(foldername = 'train/', max = -1, shuffle = False):
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
         data = get_sampled_data(subpath, args.manual_past_frames, step_dict, max_limit=max)
-
-        print((data['lidar'])[0])
 
         for key in list(data.keys()):
             if key in super_data:
@@ -229,6 +237,18 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()
 
+<<<<<<< 54143074dd4d860e56e6bcad470cca129d6f4b36
+=======
+
+            # Normally on would have the scheduler step in the epochs loop,
+            # but we want a smooth step change as described in
+            # https://sgugger.github.io/the-1cycle-policy.html and instead take
+            # a (really small) step() after each iteration.
+            #if args.scheduler:
+            #    scheduler.step()
+            #    #TODO not use scheduler not supersmall lr.
+
+>>>>>>> Fixed RNN nets to load more time steps
             # Train model with current batch and save loss and duration
             train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
@@ -327,7 +347,6 @@ def train(model, batch, loss_fn, optimizer):
     values = Variable((batch['value']).type(torch.cuda.FloatTensor))
     targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
 
-    print(lidars.shape)
     lidars = lidars.view(-1, args.past_frames+1, 600, 600)
     values = values.view(-1, 30, 11)
     targets = targets.view(-1, 60)

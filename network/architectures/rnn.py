@@ -16,7 +16,7 @@ class LSTMNet(nn.Module):
         super(LSTMNet, self).__init__()
 
         # LSTM architecture definitions
-        self.bptt = 3
+        self.bptt = 3 #Including the current time step
         self.input_size = 636 # The number of expected features in the input x
         self.hidden_size = 300 # The number of features in the hidden state h
         self.num_layers = 2 # Number of recurrent layers
@@ -111,15 +111,20 @@ class LSTMNet(nn.Module):
         l = F.elu(self.conv_d1(l))                              # [2, 32, 50, 50]
         l = self.maxpool_d1(l)                                  # [2, 32, 25, 25]
 
-        l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
+        l = F.elu(self.conv_d2(l))                              # [2, self.bptt, 25, 25]
 
-        l = l.view(l.size(0), self.bptt, -1)                              # [2, 30, 625]
+        # Make a 1D vector of the 2D image
+        l = l.view(l.size(0), self.bptt, -1)
+
+        # Pick out values for the most recent time steps
+        # NOTE stride is always 1 here!
+        v = v[:,0:self.bptt,:]
 
         # Construct lstm input vectors by concatenating the values to the lidar
-        v = v[:,0,:]
-        v = v.unsqueeze(1)
-        e = torch.cat((l, v),2)                                 # [2, 30, 636]
-        e = e.transpose(0,1)                                    # [30, 2, 636]
+        e = torch.cat((l, v),2)
+
+        # change order to (seq, batch, input)
+        e = e.transpose(0,1)
 
         # Feed input into lstm to get output.
         # Output y has shape (seq_len, batch, hidden_size * num_directions)
@@ -143,7 +148,7 @@ class LSTMNetBi(nn.Module):
         super(LSTMNetBi, self).__init__()
 
         # LSTM architecture definitions
-        self.bptt = 1
+        self.bptt = 3
         self.input_size = 636 # The number of expected features in the input x
         self.hidden_size = 300 # The number of features in the hidden state h
         self.num_layers = 2 # Number of recurrent layers
@@ -240,13 +245,20 @@ class LSTMNetBi(nn.Module):
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
 
-        l = l.view(l.size(0), self.bptt ,-1)                              # [2, 30, 625]
+        l = l.view(l.size(0), self.bptt ,-1)
+
+        # Make a 1D vector of the 2D image
+        l = l.view(l.size(0), self.bptt, -1)
+
+        # Pick out values for the most recent time steps
+        # NOTE stride is always 1 here!
+        v = v[:,0:self.bptt,:]
 
         # Construct lstm input vectors by concatenating the values to the lidar
-        v = v[:,0,:]
-        v = v.unsqueeze(1)
-        e = torch.cat((l, v),2)                                 # [2, 30, 636]
-        e = e.transpose(0,1)                                    # [30, 2, 636]
+        e = torch.cat((l, v),2)
+
+        # change order to (seq, batch, input)
+        e = e.transpose(0,1)
 
         # Feed input into lstm to get output.
         # Output y has shape (seq_len, batch, hidden_size * num_directions)
@@ -270,7 +282,7 @@ class GRUNet(nn.Module):
         super(GRUNet, self).__init__()
 
         # LSTM architecture definitions
-        self.bptt = 1
+        self.bptt = 3
         self.input_size = 636 # The number of expected features in the input x
         self.hidden_size = 300 # The number of features in the hidden state h
         self.num_layers = 2 # Number of recurrent layers
@@ -366,13 +378,18 @@ class GRUNet(nn.Module):
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
 
-        l = l.view(l.size(0), self.bptt, -1)                              # [2, 30, 625]
+        # Make a 1D vector of the 2D image
+        l = l.view(l.size(0), self.bptt, -1)
+
+        # Pick out values for the most recent time steps
+        # NOTE stride is always 1 here!
+        v = v[:,0:self.bptt,:]
 
         # Construct lstm input vectors by concatenating the values to the lidar
-        v = v[:,0,:]
-        v = v.unsqueeze(1)
-        e = torch.cat((l, v),2)                                 # [2, 30, 636]
-        e = e.transpose(0,1)                                    # [30, 2, 636]
+        e = torch.cat((l, v),2)
+
+        # change order to (seq, batch, input)
+        e = e.transpose(0,1)
 
         # Feed input into lstm to get output.
         # Output y has shape (seq_len, batch, hidden_size * num_directions)

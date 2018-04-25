@@ -46,7 +46,7 @@ class OurDataset(Dataset):
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
 
         foldername = ''
-        foldername_search= re.search('(?<=\/)\w*(?=\/(train|test|validate))', str(self.lidars[idx]))
+        foldername_search= re.search('(?<=\/)\w*(?=\/(train|test|validate))', str(self.lidars[idx])) #TODO fix regex so we can save properly
         if foldername_search is not None:
             foldername = foldername_search.group()
 
