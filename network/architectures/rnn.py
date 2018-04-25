@@ -282,7 +282,7 @@ class GRUNet(nn.Module):
         super(GRUNet, self).__init__()
 
         # LSTM architecture definitions
-        self.bptt = 3
+        self.bptt = 30
         self.input_size = 636 # The number of expected features in the input x
         self.hidden_size = 300 # The number of features in the hidden state h
         self.num_layers = 2 # Number of recurrent layers

@@ -5,6 +5,7 @@ import numpy
 import argparse
 import time
 import os
+import re
 import shutil
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
@@ -12,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 
 from architectures import *
 from data_to_dict import getData, get_sampled_data
-from dataset import OurDataset
+from dataset import OurDataset, RNNDataset
 from scheduler import Scheduler
 #from architectures.network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
 from result_meter import ResultMeter
@@ -51,12 +52,18 @@ parser.add_argument('-o','--optim', default='SGD(model.parameters(), lr=1e-5, mo
                     metavar='name(model.parameters(), param**)',
                     help = 'optimizer and its param. Ex/default: \'SGD(model.parameters(), lr=1e-5, momentum=0.9, nesterov=True)\' )')
 parser.add_argument('-pf', '--past-frames', default=0, type=int, dest='past_frames',
-                    metavar='N', help='Number of past lidar frames provided to the network. (default: 0)')
+                    metavar='N', help='Number of past lidar frames provided to the network (For RNN it is bptt) (default: 0)')
 parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_stride',
                     metavar='N', help='Stride of past frames. Ex. past-frames=2 and frames-stride=2 where x is current frame'\
                      '\n gives x, x-2, x-4. (default: 1)')
 parser.add_argument('-mpf','--manual_past_frames', default=None, type=str, metavar='\'1 2 3\'',
-                    help = 'If not use past_frames and frames-stride, list which frames you want manually. Ex: \'1 3 5 7 10 13 16\'')
+                    help = 'If not use past_frames and frames-stride, list which frames you want manually. Ex: \'1 3 5 7 10 13 16\''\
+                    'NOTE: Not applicable for RNNs!! Use -pf and -fs flags instead.')
+parser.add_argument('-bptt', '--bptt', default=1, type=int, dest='bptt',
+                    metavar='N', help='Back propagation through time. Option only available for RNNs. (default = 1)')
+# NOTE: Currently we find all rnns by doing regex. If this changes to be true, add this argument.
+#parser.add_argument('-rnn', '--rnn', dest='rnn', action='store_true',
+#                    help='Wheter we have an rnn or not. (not needed if arch str contains \'rnn\')')
 
 #TODO: data_to_dict, dataset, main.
 # save, load,
@@ -72,13 +79,18 @@ PIN_MEM = False
 if args.manual_past_frames:
     args.manual_past_frames = [int(i) for i in args.manual_past_frames.split(' ')]
 
+rnn_arch_match = re.search('RNN', args.arch, flags=re.IGNORECASE)
+if rnn_arch_match is not None:
+    args.rnn = True
+
 # find lr and momentum from optimizer settings
-lr_match = re.search('(?<=lr=)\d*e-\d*', args.optim)
+lr_match = re.search('(?<=lr=)\d*e-\d*', args.optim) #TODO remove space ' ' sensitivity
 learning_rate = float(lr_match.group()) if lr_match is not None else 0
-momentum_match = re.search('(?<=momentum=)\d*\.\d*', args.optim)
+momentum_match = re.search('(?<=momentum=)\d*\.\d*', args.optim) #TODO remove space ' ' sensitivity
 momentum = float(momentum_match.group()) if momentum_match is not None else 0
 if args.scheduler and (learning_rate == 0 or momentum == 0):
-    print("SCHEDULER WARNING: Could not find learning rate or momentum with regex. Learning rate is %i and momentum %i" %(learning_rate, momentum) )
+    print("\n SCHEDULER WARNING: Could not find learning rate or momentum with regex. \
+        Learning rate is " + str(learning_rate) + " and momentum is " + str(momentum) )
 
 def main():
     # variables
@@ -103,9 +115,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = getDataloader( foldername = 'train/', max = 100, shuffle = True)
-        dataloader_val = getDataloader(foldername = 'validate/', max = 10, shuffle = False)
-    dataloader_test = getDataloader(foldername = 'test/', max = 10, shuffle = False)
+        dataloader_train = getDataloader(max = 100, shuffle = True)
+        dataloader_val = getDataloader( max = 10, shuffle = False)
+    dataloader_test = getDataloader(max = 10, shuffle = False)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -120,7 +132,7 @@ def main():
         optimizer = eval('torch.optim.' + args.optim)
         if args.scheduler:
             lr_scheduler.setValues(len(dataloader_train)*args.epochs, learning_rate/10, learning_rate)
-            momentum_scheduler.setValues(len(dataloader_train*args.epochs), momentum, momentum-0.1)
+            momentum_scheduler.setValues(len(dataloader_train)*args.epochs, momentum, momentum-0.1)
 
     #resume from checkpoint
     if args.resume:
@@ -160,16 +172,6 @@ def main():
         del checkpoint
         print("Loaded checkpoint sucessfully")
 
-<<<<<<< 54143074dd4d860e56e6bcad470cca129d6f4b36
-=======
-    # Load datasets
-    print("-----Loading datasets-----")
-    if not args.evaluate:
-        dataloader_train = getDataloader( foldername = 'train/', max = 100, shuffle = True)
-        dataloader_val = getDataloader(foldername = 'validate/', max = 10, shuffle = False)
-    dataloader_test = getDataloader(foldername = 'test/', max = 10, shuffle = False)
-
->>>>>>> Fixed RNN nets to load more time steps
     # Train network
     if not args.evaluate:
         print("______TRAIN MODEL_______")
@@ -184,13 +186,16 @@ def main():
     test_loss = validate(model, dataloader_test, loss_fn, True)
     print("Test loss: %f" %test_loss)
 
-def getDataloader(foldername = 'train/', max = -1, shuffle = False):
+def getDataloader(max = -1, shuffle = False):
     super_data = {}
 
     if args.manual_past_frames is None:
         args.manual_past_frames = list(range(args.frame_stride,
                                              args.frame_stride*args.past_frames+1,
                                              args.frame_stride))
+    # if rnn:
+    if args.rnn:
+        args.manual_past_frames = []
 
     #print('MANUAL PAST FRAMES:', args.manual_past_frames)
 
@@ -205,14 +210,17 @@ def getDataloader(foldername = 'train/', max = -1, shuffle = False):
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
         data = get_sampled_data(subpath, args.manual_past_frames, step_dict, max_limit=max)
-
         for key in list(data.keys()):
             if key in super_data:
                 super_data[key] = numpy.concatenate((super_data[key], data[key]), axis=0)
             else:
                 super_data[key] = data[key]
 
-    dataset = OurDataset(super_data, args.no_intention) #4000
+    if args.rnn:
+        dataset = RNNDataset(super_data, args.no_intention, bptt=args.past_frames+1, frame_stride=args.frame_stride) #4000
+    else:
+        dataset = OurDataset(super_data, args.no_intention) #4000
+
     dataloader = DataLoader(dataset, batch_size=args.batch_size,
                     shuffle=shuffle, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
 
@@ -237,18 +245,6 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()
 
-<<<<<<< 54143074dd4d860e56e6bcad470cca129d6f4b36
-=======
-
-            # Normally on would have the scheduler step in the epochs loop,
-            # but we want a smooth step change as described in
-            # https://sgugger.github.io/the-1cycle-policy.html and instead take
-            # a (really small) step() after each iteration.
-            #if args.scheduler:
-            #    scheduler.step()
-            #    #TODO not use scheduler not supersmall lr.
-
->>>>>>> Fixed RNN nets to load more time steps
             # Train model with current batch and save loss and duration
             train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
@@ -347,9 +343,15 @@ def train(model, batch, loss_fn, optimizer):
     values = Variable((batch['value']).type(torch.cuda.FloatTensor))
     targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
 
-    lidars = lidars.view(-1, args.past_frames+1, 600, 600)
-    values = values.view(-1, 30, 11)
-    targets = targets.view(-1, 60)
+    #NOTE should not need any view anymore. Should be done in network and in dataloader
+    # Set correct shape on input and output
+    #lidars = lidars.view(-1, args.past_frames+1, 600, 600)
+    #values = values.view(-1, 30, 11)
+    #targets = targets.view(-1, 60)
+
+    print(numpy.shape(lidars))
+    print(numpy.shape(values))
+    print(numpy.shape(targets))
 
     output = model(lidars, values)
     loss = loss_fn(output, targets)
@@ -371,10 +373,11 @@ def validate(model, dataloader, loss_fn, save_output=False):
         targets = Variable((batch['output']).type(torch.cuda.FloatTensor))#,volatile=True)
         indices = batch['indices']
 
+        #NOTE should not need any view anymore. Should be done in network and in dataloader
         # Set correct shape on input and output
-        lidars = lidars.view(-1, args.past_frames+1, 600, 600)
-        values = values.view(-1, 30, 11)
-        targets = targets.view(-1, 60)
+        #lidars = lidars.view(-1, args.past_frames+1, 600, 600)
+        #values = values.view(-1, 30, 11)
+        #targets = targets.view(-1, 60)
 
         # Run model and calculate loss
         output = model(lidars, values)

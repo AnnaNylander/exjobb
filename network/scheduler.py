@@ -8,13 +8,13 @@ class Scheduler(object):
         #self.current = start_val
         self.step_size = (center_val - start_val)/(max_steps/2)
 
-    def setValues(max_steps,start_val,center_val):
+    def setValues(self, max_steps, start_val, center_val):
         self.max_steps = max_steps
         self.start_val = start_val
         self.center_val = center_val
         #self.current = start_val
         self.step_size = (center_val - start_val)/(max_steps/2)
-        
+
     def update(self, optimizer, step):
         half_steps = self.max_steps // 2
         if step <= half_steps:

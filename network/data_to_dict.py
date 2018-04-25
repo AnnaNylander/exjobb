@@ -12,9 +12,12 @@ def getData(path, past_frames, max=-1,):
 
     dic = {}
     indices = getIndices(path_topviews, max)
+    #print(np.shape(np.array(indices)))
     dic['indices'] = indices
     dic['lidar'] = getLidarFrames(path, indices, past_frames)
+    #print(np.shape(dic['lidar']))
     dic['values'] = [path+'input/values/input_%i.csv' %i for i in indices]
+    #print(np.shape(dic['values']))
     dic['output'] = [path+'output/output_%i.csv' %i for i in indices]
 
     return dic
@@ -65,12 +68,13 @@ def getArray(path, h, w, header, indices, filename):
 
 def getIndices(path, max):
     nr_of_files = len(os.listdir(path))
-    res = np.zeros([max])
+    res = np.zeros([max,1])
     idx = 0
     for filename in os.listdir(path):
         if idx >= max:
             return sorted(res)
         data = int (re.search('\d+', filename).group())
+        #res.append(data)
         res[idx] = data
         idx = idx + 1
         #if(idx%100==0):

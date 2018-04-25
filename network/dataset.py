@@ -27,12 +27,6 @@ class OurDataset(Dataset):
     def __len__(self):
         return len(self.indices)
 
-
-#    def __getitem__(self, idx):
-#        lidar = np.genfromtxt(self.lidars[idx], delimiter=',')
-#        return {'indices': self.indices[idx], 'lidar': lidar, \
-#                'value': self.values[idx], 'output': self.outputs[idx]}
-
     def __getitem__(self, idx):
         lidar = []
         for l in self.lidars[idx]:
@@ -45,10 +39,74 @@ class OurDataset(Dataset):
             values[:,(5,6)] = 0
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
 
-        foldername = ''
-        foldername_search= re.search('(?<=\/)\w*(?=\/(train|test|validate))', str(self.lidars[idx])) #TODO fix regex so we can save properly
-        if foldername_search is not None:
-            foldername = foldername_search.group()
+        output = output.reshape(60) #TODO does this work?
+
+        foldername_search= re.search('(?<=dataset\/)\w*\/\w*(?=\/)', str(self.lidars[idx])).group()
+        foldername = re.sub('\/','_',foldername_search)
 
         return {'indices': self.indices[idx], 'lidar': np.stack(lidar, axis=0), \
                 'value': values, 'output': output, 'foldername': foldername}
+
+
+class RNNDataset(Dataset):
+
+    def __init__(self, dic, no_intention, bptt = 1, frame_stride = 1, transform=None):
+        self.bptt = bptt
+        self.chunk = bptt*frame_stride
+        self.frame_stride = frame_stride
+
+        indices = dic.get('indices')
+        indices = np.split(indices[:-(len(indices)%self.chunk)],len(indices)//self.chunk)
+        indices = np.array(indices)
+        indices = indices[:,0:self.chunk:frame_stride,:]
+        self.indices = indices
+
+        lidars = dic.get('lidar')
+        lidars = np.split(lidars[:-(len(lidars)%self.chunk)],len(lidars)//self.chunk)
+        lidars = np.array(lidars)
+        lidars = lidars[:,0:self.chunk:frame_stride,:]
+        self.lidars = lidars
+
+        values = dic.get('values')
+        values = np.split(values[:-(len(values)%self.chunk)],len(values)//self.chunk)
+        values = np.array(values)
+        values = values[:,0:self.chunk:frame_stride]
+        self.values = values
+
+        outputs = dic.get('output')
+        outputs = np.split(outputs[:-(len(outputs)%self.chunk)],len(outputs)//self.chunk)
+        outputs = np.array(outputs)
+        outputs = outputs[:,0:self.chunk:frame_stride]
+        self.outputs = outputs
+
+        self.no_intention = no_intention
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        lidar = []
+        for l in self.lidars[idx]:
+            temp = np.genfromtxt(l[0], delimiter=',')
+            lidar.append(temp)
+
+        values = []
+        for v in self.values[idx]:
+            temp = np.genfromtxt(v, delimiter=',', skip_header=True)
+            if self.no_intention: # set all intentions to 0
+                temp[:,(5,6)] = 0
+            values.append(temp[0]) #pick only current value
+        values = np.nan_to_num(values)
+
+        output = []
+        for out in self.outputs[idx]:
+            temp = np.genfromtxt(out, delimiter=',', skip_header=True)
+            temp = temp.reshape(60)
+            output.append(temp)
+
+        foldername_search= re.search('(?<=dataset\/)\w*\/\w*(?=\/)', str(self.lidars[idx])).group()
+        foldername = re.sub('\/','_',foldername_search)
+
+        return {'indices': self.indices[idx], 'lidar': np.stack(lidar, axis=0), \
+                'value': values, 'output': np.array(output), 'foldername': foldername}
