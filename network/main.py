@@ -72,9 +72,13 @@ PIN_MEM = False
 if args.manual_past_frames:
     args.manual_past_frames = [int(i) for i in args.manual_past_frames.split(' ')]
 
-# TODO do some regex or something.
-learning_rate = 1e-5
-momentum = 0.9
+# find lr and momentum from optimizer settings
+lr_match = re.search('(?<=lr=)\d*e-\d*', args.optim)
+learning_rate = float(lr_match.group()) if lr_match is not None else 0
+momentum_match = re.search('(?<=momentum=)\d*\.\d*', args.optim)
+momentum = float(momentum_match.group()) if momentum_match is not None else 0
+if args.scheduler and (learning_rate == 0 or momentum == 0):
+    print("SCHEDULER WARNING: Could not find learning rate or momentum with regex. Learning rate is %i and momentum %i" %(learning_rate, momentum) )
 
 def main():
     # variables
@@ -96,6 +100,13 @@ def main():
         print("avg loss @:",all_time_best_res)
         del all_time_best # Remove from GPU memory
 
+    # Load datasets
+    print("-----Loading datasets-----")
+    if not args.evaluate:
+        dataloader_train = getDataloader( foldername = 'train/', max = 100, shuffle = True)
+        dataloader_val = getDataloader(foldername = 'validate/', max = 10, shuffle = False)
+    dataloader_test = getDataloader(foldername = 'test/', max = 10, shuffle = False)
+
     # create new model and lossfunctions and stuff
     if not args.resume:
         print("-----Creating network-----")
@@ -108,9 +119,8 @@ def main():
         loss_fn = torch.nn.MSELoss().cuda()
         optimizer = eval('torch.optim.' + args.optim)
         if args.scheduler:
-            #TODO max_steps should be lenght of dataloaders?
-            lr_scheduler = Scheduler('lr',max_steps = 1000, start_val=learning_rate/10, center_val = learning_rate)
-            momentum_scheduler = Scheduler('momentum', max_steps = 1000, start_val=momentum, center_val = momentum-0.1)
+            lr_scheduler.setValues(len(dataloader_train)*args.epochs, learning_rate/10, learning_rate)
+            momentum_scheduler.setValues(len(dataloader_train*args.epochs), momentum, momentum-0.1)
 
     #resume from checkpoint
     if args.resume:
@@ -130,9 +140,6 @@ def main():
         args.optim = checkpoint['optim']
         loss_fn = torch.nn.MSELoss().cuda()
         optimizer = eval('torch.optim.' + args.optim)
-        if args.scheduler:
-            lr_scheduler = Scheduler()
-            momentum_scheduler = Scheduler()
 
         #load variables
         print("\t Loading variables")
@@ -150,19 +157,8 @@ def main():
         validation_losses.deserialize(checkpoint['validation_losses'])
         times.deserialize(checkpoint['times'])
 
-        # init scheduler after we have loaded the optimizer
-        #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer)
-        #scheduler.load_state_dict(checkpoint['scheduler'])
-
         del checkpoint
         print("Loaded checkpoint sucessfully")
-
-    # Load datasets
-    print("-----Loading datasets-----")
-    if not args.evaluate:
-        dataloader_train = getDataloader( foldername = 'train/', max = 100, shuffle = True)
-        dataloader_val = getDataloader(foldername = 'validate/', max = 10, shuffle = False)
-    dataloader_test = getDataloader(foldername = 'test/', max = 10, shuffle = False)
 
     # Train network
     if not args.evaluate:
@@ -215,14 +211,6 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
 
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()
-
-            # Normally on would have the scheduler step in the epochs loop,
-            # but we want a smooth step change as described in
-            # https://sgugger.github.io/the-1cycle-policy.html and instead take
-            # a (really small) step() after each iteration.
-            #if args.scheduler:
-            #    scheduler.step()
-            #    #TODO not use scheduler not supersmall lr.
 
             # Train model with current batch and save loss and duration
             train_loss = train(model, batch, loss_fn, optimizer)
