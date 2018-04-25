@@ -3,7 +3,7 @@ import re
 import numpy as np
 
 def getData(path, past_frames, max=-1,):
-    print("Loading: " + path)
+    #print("Loading: " + path)
     path_topviews = path + 'input/topviews/max_elevation/'
     path_values = path + 'input/values/'
     path_output = path + 'output/'
@@ -24,7 +24,11 @@ def getLidarFrames(path, indices, past_frames):
     subdir = 'input/topviews/max_elevation/'
     categories = 'straight|left|right|right_intention|left_intention|traffic_light|other'
     base_path = re.search('.*(?=(' + categories + ')\/\Z)',path).group(0)
-    folders = ['train/', 'validate/', 'test/']
+    #folders = ['train/', 'validate/', 'test/']
+    folders = ['straight/','left/','right/','right_intention/','left_intention/','traffic_light','other/']
+
+    print(indices)
+
     for i in indices:
         frames = []
         frames.append(path+'input/topviews/max_elevation/me_%i.csv' %i) #main lidar picture. The current one.
@@ -32,10 +36,15 @@ def getLidarFrames(path, indices, past_frames):
         for j in past_frames:
             idx = i - j
             frame = ''
-            while frame == '':
+            while frame == '': #TODO only go through all frames once, not forever
                 for folder in folders:
-                    if os.path.isfile(base_path + folder + 'input/topviews/max_elevation/me_%i.csv' %idx):
-                        frame = base_path + folder + 'input/topviews/max_elevation/me_%i.csv' %idx
+                    filename = base_path + folder + 'input/topviews/max_elevation/me_%i.csv' %idx
+                    if os.path.isfile(filename):
+			print('Found', filename)
+                        frame = filename
+		    else:
+			print('No ', filename)
+
                 idx += 1
             frames.append(frame)
         res.append(frames)
@@ -95,14 +104,17 @@ def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
                  }
     '''
 
+    print("Loading: " + data_path)
+
     sampled_data = {}
 
     # for each category in banana
     for category in step_dict.keys():
+        print(past_frames)
 
         # Data has the following structure:
         # key in indices, values, lidars, output
-        cat_data = getData(data_path + category + '/', [])
+        cat_data = getData(data_path + category + '/', past_frames)
 
         # Get the number of frames in this category
         n_frames = len(cat_data['indices'])
@@ -135,5 +147,6 @@ def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
                     data_to_keep = np.concatenate((sampled_data[key], data_to_keep), axis=0)
 
                 sampled_data[key] = data_to_keep
+
 
     return sampled_data

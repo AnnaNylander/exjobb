@@ -178,19 +178,25 @@ def getDataloader(foldername = 'train/', max = -1, shuffle = False):
     super_data = {}
 
     if args.manual_past_frames is None:
-        args.manual_past_frames = list(range(args.frame_stride,args.frame_stride*args.past_frames+1, args.frame_stride))
+        args.manual_past_frames = list(range(args.frame_stride,
+                                             args.frame_stride*args.past_frames+1,
+                                             args.frame_stride))
 
-    step_dict = {'straight' : 1,
-                 'left' : 1,
+    print('MANUAL PAST FRAMES:', args.manual_past_frames)
+
+    step_dict = {'straight' : 50,
+                 'left' : 2,
                  'right' : 1,
                  'right_intention' : 1,
                  'left_intention' : 1,
-                 'traffic_light' : 1,
+                 'traffic_light' : 50,
                  'other' : 0}
 
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
         data = get_sampled_data(subpath, args.manual_past_frames, step_dict, max_limit=max)
+
+        print((data['lidar'])[0])
 
         for key in list(data.keys()):
             if key in super_data:
@@ -218,7 +224,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
     step = step_start
     for epoch in range(epoch_start, args.epochs):
         # Train for one epoch
-        print(len(dataloader_train))
+        print('Epoch length:',len(dataloader_train), '(mini-batches)')
 
         for i, batch in enumerate(dataloader_train):
             start_time = time.time()
@@ -321,6 +327,7 @@ def train(model, batch, loss_fn, optimizer):
     values = Variable((batch['value']).type(torch.cuda.FloatTensor))
     targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
 
+    print(lidars.shape)
     lidars = lidars.view(-1, args.past_frames+1, 600, 600)
     values = values.view(-1, 30, 11)
     targets = targets.view(-1, 60)
