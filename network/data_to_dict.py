@@ -81,7 +81,7 @@ def getIndices(path, max):
         #    print('\tindex: %i of max %i, filetotal is %i' %(idx, max, nr_of_files) )
     return res
 
-def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
+def get_sampled_data(data_path, past_frames, step_dict, max_limit=None, return_sorted=False):
     '''Creates a dictionary of sampled data, where step_dict is a dictionary
     from category to step size, e.g. {'left':2} to keep every other frame in
     category 'left'. Parameter max_limit tells how many indices to keep in each
@@ -108,7 +108,6 @@ def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
 
     # for each category in banana
     for category in step_dict.keys():
-
         # Data has the following structure:
         # key in indices, values, lidars, output
         cat_data = getData(data_path + category + '/', past_frames)
@@ -119,7 +118,7 @@ def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
         # Get the stepsize for this category
         step = step_dict[category]
 
-        # Check for empy categories
+        # Check for empty categories
         is_empty_category = len(cat_data['indices']) == 0
 
         # If there is a non-zero step size, pick out the frames
@@ -139,11 +138,27 @@ def get_sampled_data(data_path, past_frames, step_dict, max_limit=None):
                 if max_limit is not None and len(data_to_keep) > max_limit:
                     data_to_keep = data_to_keep[0:max_limit]
 
+                # Make array with category indicator
+                cat_indicator = [category]*len(data_to_keep)
+
                 # Append current data to all previously sampled data
                 if key in sampled_data:
-                    data_to_keep = np.concatenate((sampled_data[key], data_to_keep), axis=0)
+                    sampled_data[key] = np.concatenate((sampled_data[key], data_to_keep), axis=0)
+                    #cat_indicator = np.concatenate((sampled_data['category'], cat_indicator), axis=0)
+                else:
+                    sampled_data[key] = data_to_keep
 
-                sampled_data[key] = data_to_keep
+            if 'category' in sampled_data:
+                sampled_data['category'] = np.concatenate((sampled_data['category'], cat_indicator), axis=0)
+            else:
+                sampled_data['category'] = cat_indicator
 
+    # Sort the data by index if wanted
+    if return_sorted:
+        asorted_indices = sampled_data['indices']
+        for key in list(sampled_data.keys()):
+            values = sampled_data[key]
+            sorted_values = [x for _,x in sorted(zip(asorted_indices, values))]
+            sampled_data[key] = np.asarray(sorted_values)
 
     return sampled_data

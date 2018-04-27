@@ -10,6 +10,7 @@ import shutil
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.sampler import SequentialSampler, WeightedRandomSampler
 
 from architectures import *
 from data_to_dict import getData, get_sampled_data
@@ -62,8 +63,8 @@ parser.add_argument('-mpf','--manual_past_frames', default=None, type=str, metav
 parser.add_argument('-bptt', '--bptt', default=1, type=int, dest='bptt',
                     metavar='N', help='Back propagation through time. Option only available for RNNs. (default = 1)')
 # NOTE: Currently we find all rnns by doing regex. If this changes to be true, add this argument.
-#parser.add_argument('-rnn', '--rnn', dest='rnn', action='store_true',
-#                    help='Wheter we have an rnn or not. (not needed if arch str contains \'rnn\')')
+parser.add_argument('-rnn', '--rnn', dest='rnn', action='store_true',
+                    help='Wheter we have an rnn or not. (not needed if arch str contains \'rnn\')')
 
 #TODO: data_to_dict, dataset, main.
 # save, load,
@@ -115,9 +116,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = getDataloader(max = 100, shuffle = True)
-        dataloader_val = getDataloader( max = 10, shuffle = False)
-    dataloader_test = getDataloader(max = 10, shuffle = False)
+        dataloader_train = getDataloader(shuffle = args.shuffle)
+        dataloader_val = getDataloader(max=5, shuffle = False)
+    dataloader_test = getDataloader(max=5, shuffle = False)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -186,19 +187,10 @@ def main():
     test_loss = validate(model, dataloader_test, loss_fn, True)
     print("Test loss: %f" %test_loss)
 
-def getDataloader(max = -1, shuffle = False):
+def get_categorized_data(max_limit):
     super_data = {}
 
-    if args.manual_past_frames is None:
-        args.manual_past_frames = list(range(args.frame_stride,
-                                             args.frame_stride*args.past_frames+1,
-                                             args.frame_stride))
-    # if rnn:
-    if args.rnn:
-        args.manual_past_frames = []
-
-    #print('MANUAL PAST FRAMES:', args.manual_past_frames)
-
+    # Sample categories with different stride to balance them
     step_dict = {'straight' : 50,
                  'left' : 2,
                  'right' : 1,
@@ -209,23 +201,84 @@ def getDataloader(max = -1, shuffle = False):
 
     for subdir in os.listdir(PATH_DATA):
         subpath = PATH_DATA + subdir + '/'
-        data = get_sampled_data(subpath, args.manual_past_frames, step_dict, max_limit=max)
+        data = get_sampled_data(subpath, args.manual_past_frames, step_dict, max_limit=max_limit)
+
         for key in list(data.keys()):
             if key in super_data:
                 super_data[key] = numpy.concatenate((super_data[key], data[key]), axis=0)
             else:
                 super_data[key] = data[key]
 
+    return super_data
+
+def get_sequential_data(max_limit=-1):
+    ''' Returns sequential data sorted by index within each subset (carla episode).
+    Note than each category will be cut at max_limit, so the resulting data will
+    not be coherent.
+    '''
+    super_data = {}
+
+    # Sample all categories with stride 1. Skip category 'other'
+    step_dict = {'straight' : 1,
+                 'left' : 1,
+                 'right' : 1,
+                 'right_intention' : 1,
+                 'left_intention' : 1,
+                 'traffic_light' : 1,
+                 'other' : 0}
+
+    for subdir in os.listdir(PATH_DATA):
+        subpath = PATH_DATA + subdir + '/'
+        data = get_sampled_data(subpath, [], step_dict, max_limit=max_limit, return_sorted=True)
+
+        for key in list(data.keys()):
+            if key in super_data:
+                super_data[key] = numpy.concatenate((super_data[key], data[key]), axis=0)
+            else:
+                super_data[key] = data[key]
+
+    return super_data
+
+def getDataloader(max = -1, shuffle = False):
+    #super_data = {}
+
+    if args.manual_past_frames is None:
+        args.manual_past_frames = list(range(args.frame_stride,
+                                             args.frame_stride*args.past_frames+1,
+                                             args.frame_stride))
+
+    # We need to load data differently depending on the architecture
     if args.rnn:
-        dataset = RNNDataset(super_data, args.no_intention, bptt=args.past_frames+1, frame_stride=args.frame_stride) #4000
+        # TODO Remove max arg
+        data = get_sequential_data(max_limit=max)
+
+        dataset = RNNDataset(data, args.no_intention,
+                                bptt=args.past_frames+1,
+                                frame_stride=args.frame_stride)
+
+        sampler = SequentialSampler(dataset)
+        return DataLoader(dataset, batch_size=args.batch_size,
+                                   shuffle=False,
+                                   num_workers=NUM_WORKERS,
+                                   pin_memory=PIN_MEM,
+                                   drop_last=True,
+                                   sampler=sampler)
+
     else:
-        dataset = OurDataset(super_data, args.no_intention) #4000
+        data = get_categorized_data(max_limit=max)
 
-    dataloader = DataLoader(dataset, batch_size=args.batch_size,
-                    shuffle=shuffle, num_workers=NUM_WORKERS, pin_memory=PIN_MEM)
+        # calculating weights for balancing categoreis.
+        array = data['category']
+        category_count = dict([(category, len(array[numpy.where(array == category)])) for category in numpy.unique(array)])
+        equal_weight = 1/len(category_count)
+        weights = [equal_weight/(category_count[x]) for x in array]
 
-    return dataloader
-
+        sampler = WeightedRandomSampler(weights, len(array), replacement=True)
+        dataset = OurDataset(data, args.no_intention)
+        return DataLoader(dataset, batch_size=args.batch_size,
+                                   shuffle=shuffle,
+                                   num_workers=NUM_WORKERS,
+                                   pin_memory=PIN_MEM)
 
 def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                 momentum_scheduler, loss_fn, train_losses,
@@ -348,10 +401,6 @@ def train(model, batch, loss_fn, optimizer):
     #lidars = lidars.view(-1, args.past_frames+1, 600, 600)
     #values = values.view(-1, 30, 11)
     #targets = targets.view(-1, 60)
-
-    print(numpy.shape(lidars))
-    print(numpy.shape(values))
-    print(numpy.shape(targets))
 
     output = model(lidars, values)
     loss = loss_fn(output, targets)

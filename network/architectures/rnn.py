@@ -16,12 +16,13 @@ class LSTMNet(nn.Module):
         super(LSTMNet, self).__init__()
 
         # LSTM architecture definitions
-        self.bptt = 3 #Including the current time step
+        self.bptt = 30 #Including the current time step
         self.input_size = 636 # The number of expected features in the input x
-        self.hidden_size = 300 # The number of features in the hidden state h
-        self.num_layers = 2 # Number of recurrent layers
+        self.hidden_size = 500 # The number of features in the hidden state h
+        self.num_layers = 3 # Number of recurrent layers
         self.dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
         self.bidirectional = False # If True, becomes a bidirectional LSTM
+        self.batch_first = True # make input have shape (batch_size, seq, input_size)
         self.h_n = None
         self.c_n = None
 
@@ -66,16 +67,19 @@ class LSTMNet(nn.Module):
                             hidden_size=self.hidden_size,
                             num_layers=self.num_layers,
                             dropout=self.dropout,
-                            bidirectional=self.bidirectional)
+                            bidirectional=self.bidirectional,
+                            batch_first=self.batch_first)
 
-        self.linear_d3 = nn.Linear(300,60)
+        # This layer was used before when only using the last output
+        self.linear_d3 = nn.Linear(self.hidden_size, 60)
 
     def forward(self, l, v):
+        batch_size = l.size(0)
 
-        # l is expected to be of shape [2, self.bptt, 600, 600]
-        # v is expected to be of shape [2, self.bptt, 11]
-        # h_n is expected to be of shape [2*1, 2, 300]
-        # c_n is expected to be of shape [2*1, 2, 300]
+        # l is expected to be of shape [batch_size, self.bptt, 600, 600]
+        # v is expected to be of shape [batch_size, self.bptt, 11]
+        # h_n is expected to be of shape [2*1, batch_size, 300]
+        # c_n is expected to be of shape [2*1, batch_size, 300]
 
         # encoder
         l = F.elu(self.conv_e0(l))                              # [2, 32, 600, 600]
@@ -114,31 +118,26 @@ class LSTMNet(nn.Module):
         l = F.elu(self.conv_d2(l))                              # [2, self.bptt, 25, 25]
 
         # Make a 1D vector of the 2D image
-        l = l.view(l.size(0), self.bptt, -1)
-
-        # Pick out values for the most recent time steps
-        # NOTE stride is always 1 here!
-        v = v[:,0:self.bptt,:]
+        l = l.view(batch_size, self.bptt, -1)
 
         # Construct lstm input vectors by concatenating the values to the lidar
         e = torch.cat((l, v),2)
 
-        # change order to (seq, batch, input)
-        e = e.transpose(0,1)
+        # Initiate hidden and cell state
+        if self.h_n is None:
+            self.h_n = Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda())
+            self.c_n = Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda())
 
         # Feed input into lstm to get output.
-        # Output y has shape (seq_len, batch, hidden_size * num_directions)
-        if self.h_n is None:
-            self.h_n = Variable(torch.zeros(self.num_layers, l.size(0), self.hidden_size).cuda())
-            self.c_n = Variable(torch.zeros(self.num_layers, l.size(0), self.hidden_size).cuda())
+        # Output y has shape (batch, seq_len, hidden_size * num_directions)
 
-        y, (h_n, c_n) = self.lstm_d3(e, (self.h_n, self.c_n))                  # [30, 2, 300]'
+        y, (h_n, c_n) = self.lstm_d3(e, (self.h_n, self.c_n))                  # [batch_size, bptt, hidden_size]'
 
         # Detach to forget gradients of past hidden and cell states
         self.h_n = h_n.detach()
         self.c_n = c_n.detach()
 
-        y = self.linear_d3(y[-1])                               # [2, 60]
+        y = self.linear_d3(y)                               # [2, 60]
 
         return y
 
@@ -148,12 +147,13 @@ class LSTMNetBi(nn.Module):
         super(LSTMNetBi, self).__init__()
 
         # LSTM architecture definitions
-        self.bptt = 3
+        self.bptt = 30
         self.input_size = 636 # The number of expected features in the input x
-        self.hidden_size = 300 # The number of features in the hidden state h
-        self.num_layers = 2 # Number of recurrent layers
+        self.hidden_size = 500 # The number of features in the hidden state h
+        self.num_layers = 3 # Number of recurrent layers
         self.dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
         self.bidirectional = True # If True, becomes a bidirectional LSTM
+        self.batch_first = True # make input have shape (batch_size, seq, input_size)
         self.h_n = None
         self.c_n = None
 
@@ -198,11 +198,14 @@ class LSTMNetBi(nn.Module):
                             hidden_size=self.hidden_size,
                             num_layers=self.num_layers,
                             dropout=self.dropout,
-                            bidirectional=self.bidirectional)
+                            bidirectional=self.bidirectional,
+                            batch_first=self.batch_first)
 
-        self.linear_d3 = nn.Linear(600,60)
+        self.linear_d3 = nn.Linear(2*self.hidden_size, 60)
 
     def forward(self, l, v):
+
+        batch_size = l.size(0)
 
         # l is expected to be of shape [2, self.bptt, 600, 600]
         # v is expected to be of shape [2, self.bptt, 11]
@@ -245,26 +248,18 @@ class LSTMNetBi(nn.Module):
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
 
-        l = l.view(l.size(0), self.bptt ,-1)
-
         # Make a 1D vector of the 2D image
-        l = l.view(l.size(0), self.bptt, -1)
+        l = l.view(batch_size, self.bptt, -1)
 
-        # Pick out values for the most recent time steps
-        # NOTE stride is always 1 here!
-        v = v[:,0:self.bptt,:]
 
         # Construct lstm input vectors by concatenating the values to the lidar
         e = torch.cat((l, v),2)
 
-        # change order to (seq, batch, input)
-        e = e.transpose(0,1)
-
         # Feed input into lstm to get output.
         # Output y has shape (seq_len, batch, hidden_size * num_directions)
         if self.h_n is None:
-            self.h_n = Variable(torch.zeros(self.num_layers*2, l.size(0), self.hidden_size).cuda())
-            self.c_n = Variable(torch.zeros(self.num_layers*2, l.size(0), self.hidden_size).cuda())
+            self.h_n = Variable(torch.zeros(self.num_layers*2, batch_size, self.hidden_size).cuda())
+            self.c_n = Variable(torch.zeros(self.num_layers*2, batch_size, self.hidden_size).cuda())
 
         y, (h_n, c_n) = self.lstm_d3(e, (self.h_n, self.c_n))                  # [30, 2, 300]'
 
@@ -272,7 +267,7 @@ class LSTMNetBi(nn.Module):
         self.h_n = h_n.detach()
         self.c_n = c_n.detach()
 
-        y = self.linear_d3(y[-1])                               # [2, 60]
+        y = self.linear_d3(y)                               # [2, 60]
 
         return y
 
@@ -284,10 +279,11 @@ class GRUNet(nn.Module):
         # LSTM architecture definitions
         self.bptt = 30
         self.input_size = 636 # The number of expected features in the input x
-        self.hidden_size = 300 # The number of features in the hidden state h
-        self.num_layers = 2 # Number of recurrent layers
+        self.hidden_size = 500 # The number of features in the hidden state h
+        self.num_layers = 3 # Number of recurrent layers
         self.dropout = 0 # If non-zero, introduces a Dropout layer on the outputs of each LSTM layer except the last layer
         self.bidirectional = False # If True, becomes a bidirectional LSTM
+        self.batch_first = True
         self.h_n = None
 
         # lidar encoder
@@ -331,11 +327,14 @@ class GRUNet(nn.Module):
                             hidden_size=self.hidden_size,
                             num_layers=self.num_layers,
                             dropout=self.dropout,
-                            bidirectional=self.bidirectional)
+                            bidirectional=self.bidirectional,
+                            batch_first=self.batch_first)
 
-        self.linear_d3 = nn.Linear(300,60)
+        self.linear_d3 = nn.Linear(self.hidden_size, 60)
 
     def forward(self, l, v):
+
+        batch_size = l.size(0)
 
         # l is expected to be of shape [2, self.bptt, 600, 600]
         # v is expected to be of shape [2, self.bptt, 11]
@@ -379,29 +378,22 @@ class GRUNet(nn.Module):
         l = F.elu(self.conv_d2(l))                              # [2, 30, 25, 25]
 
         # Make a 1D vector of the 2D image
-        l = l.view(l.size(0), self.bptt, -1)
-
-        # Pick out values for the most recent time steps
-        # NOTE stride is always 1 here!
-        v = v[:,0:self.bptt,:]
+        l = l.view(batch_size, self.bptt, -1)
 
         # Construct lstm input vectors by concatenating the values to the lidar
         e = torch.cat((l, v),2)
 
-        # change order to (seq, batch, input)
-        e = e.transpose(0,1)
-
         # Feed input into lstm to get output.
         # Output y has shape (seq_len, batch, hidden_size * num_directions)
         if self.h_n is None:
-            self.h_n = Variable(torch.zeros(self.num_layers, l.size(0), self.hidden_size).cuda())
+            self.h_n = Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda())
 
         y, h_n = self.gru_d3(e, self.h_n)                  # [30, 2, 300]'
 
         # Detach to forget gradients of past hidden states
         self.h_n = h_n.detach()
 
-        y = self.linear_d3(y[-1])                               # [2, 60]
+        y = self.linear_d3(y)                               # [2, 60]
 
         return y
 

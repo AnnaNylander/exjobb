@@ -21,6 +21,9 @@ class OurDataset(Dataset):
         outputs = dic.get('output')
         self.outputs = outputs
 
+        categories = dic.get('category')
+        self.categories = categories
+
         self.no_intention = no_intention
         self.transform = transform
 
@@ -39,13 +42,17 @@ class OurDataset(Dataset):
             values[:,(5,6)] = 0
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
 
-        output = output.reshape(60) #TODO does this work?
+        output = output.reshape(60)
 
         foldername_search= re.search('(?<=dataset\/)\w*\/\w*(?=\/)', str(self.lidars[idx])).group()
         foldername = re.sub('\/','_',foldername_search)
 
-        return {'indices': self.indices[idx], 'lidar': np.stack(lidar, axis=0), \
-                'value': values, 'output': output, 'foldername': foldername}
+        return {'indices': self.indices[idx],
+                'lidar': np.stack(lidar, axis=0),
+                'value': values,
+                'output': output,
+                'foldername': foldername,
+                'category': self.categories[idx]}
 
 
 class RNNDataset(Dataset):
