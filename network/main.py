@@ -60,13 +60,16 @@ parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_st
 parser.add_argument('-mpf','--manual_past_frames', default=None, type=str, metavar='\'1 2 3\'',
                     help = 'If not use past_frames and frames-stride, list which frames you want manually. Ex: \'1 3 5 7 10 13 16\''\
                     'NOTE: Not applicable for RNNs!! Use -pf and -fs flags instead.')
-parser.add_argument('-bptt', '--bptt', default=1, type=int, dest='bptt',
-                    metavar='N', help='Back propagation through time. Option only available for RNNs. (default = 1)')
+# NOTE not used at the moment
+#parser.add_argument('-bptt', '--bptt', default=1, type=int, dest='bptt',
+#                    metavar='N', help='Back propagation through time. Option only available for RNNs. (default = 1)')
 # NOTE: Currently we find all rnns by doing regex. If this changes to be true, add this argument.
 parser.add_argument('-rnn', '--rnn', dest='rnn', action='store_true',
                     help='Wheter we have an rnn or not. (not needed if arch str contains \'rnn\')')
 parser.add_argument('-bl', '--balance', dest='balance', action='store_true',
-                    help='Balance dataset by sampling with replacement. Not applicable for RNNs. Forces shuffle to True.')
+                    help='Balance dataset by sampling with replacement. Not applicable for RNNs. Forces shuffle to True in training set.')
+#parser.add_argument('-t', '--timeout', default=60*6, type=int, dest='timeout',
+#                    metavar='N', help='Maximum number of minutes to train. (default = 360)')
 
 #TODO: data_to_dict, dataset, main.
 # save, load,
@@ -96,6 +99,10 @@ if args.scheduler and (learning_rate == 0 or momentum == 0):
         Learning rate is " + str(learning_rate) + " and momentum is " + str(momentum) )
 
 def main():
+    #write info file
+    if not os.path.exists(PATH_SAVE):
+            os.makedirs(PATH_SAVE)
+    write_info_file()
     # variables
     best_res = 1000000 #big number
     epoch_start = 0
@@ -118,9 +125,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(shuffle = args.shuffle)
-        dataloader_val = get_data_loader(max=5, shuffle = False)
-    dataloader_test = get_data_loader(max=5, shuffle = False)
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance) # ca 232.500 frames in total
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', max=4000, shuffle=False, balance=False) # ca 35.000 frames in total in 4 subsets (validation set has only one category)
+    dataloader_test = get_data_loader(PATH_DATA + 'test/', max=-1, shuffle = False, balance=False)  # ca 66.200 frames in total in 8 subsets
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -178,18 +185,16 @@ def main():
     # Train network
     if not args.evaluate:
         print("______TRAIN MODEL_______")
-        if not os.path.exists(PATH_SAVE):
-                os.makedirs(PATH_SAVE)
         main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                     momentum_scheduler, loss_fn, train_losses, validation_losses,
                     times, dataloader_train, dataloader_val, best_res, all_time_best_res)
 
     # Final evaluation on test dataset
-    print("_____EVALUATE MODEL______")
-    test_loss = validate(model, dataloader_test, loss_fn, True)
-    print("Test loss: %f" %test_loss)
+    #print("_____EVALUATE MODEL______")
+    #test_loss = validate(model, dataloader_test, loss_fn, True)
+    #print("Test loss: %f" %test_loss)
 
-def get_data_loader(max = -1, shuffle = False):
+def get_data_loader(path, max=-1, shuffle=False, balance=False, sampler_max = None):
     if args.manual_past_frames is None:
         args.manual_past_frames = list(range(args.frame_stride,
                                              args.frame_stride*args.past_frames+1,
@@ -199,7 +204,7 @@ def get_data_loader(max = -1, shuffle = False):
     if args.rnn:
         args.manual_past_frames = []
         # TODO Remove max arg
-        data = get_data(PATH_DATA, args.manual_past_frames, max)
+        data = get_data(path, args.manual_past_frames, -1)
 
         dataset = RNNDataset(data, args.no_intention,
                                 bptt=args.past_frames+1,
@@ -214,9 +219,9 @@ def get_data_loader(max = -1, shuffle = False):
                                    sampler=sampler)
 
     else:
-        data = get_data(PATH_DATA, args.manual_past_frames, max)
+        data = get_data(path, args.manual_past_frames, max)
 
-        if args.balance:
+        if balance:
             # calculate weights for balancing categories
             array = data['category']
             category_count = dict([(category, len(array[numpy.where(array == category)])) for category in numpy.unique(array)])
@@ -233,8 +238,10 @@ def get_data_loader(max = -1, shuffle = False):
                             'traffic_light': 1,
                             'other': 0
                             }
-
             weights = [(equal_weight*rel_weights[x])/(category_count[x]) for x in array]
+            if sampler_max is None:
+                sampler_max = len(array)
+
             sampler = WeightedRandomSampler(weights, len(array), replacement=True)
             args.shuffle = False
 
@@ -264,12 +271,12 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
         print('Epoch length:',len(dataloader_train), '(mini-batches)')
 
         for i, batch in enumerate(dataloader_train):
-            start_time = time.time()
+            batch_start_time = time.time()
 
             # Train model with current batch and save loss and duration
             train_loss = train(model, batch, loss_fn, optimizer)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
-            times.update(epoch + 1, i + 1, step, time.time() - start_time)
+            times.update(epoch + 1, i + 1, step, time.time() - batch_start_time)
 
             #Update learning rate and momentum
             if args.scheduler:
@@ -279,6 +286,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             # Print statistics
             if step % args.print_freq == 0:
                 print_statistics(train_losses, times, len(dataloader_train))
+
             # Evaluate on validation set and save checkpoint
             if step % args.plot_freq == 0:
                 validation_loss = validate(model, dataloader_val, loss_fn)
@@ -448,6 +456,16 @@ def get_n_params(model):
 def save_statistic(result_meter, path):
     values = numpy.array(result_meter.values)
     numpy.savetxt(path, values, comments='', delimiter=',',fmt='%.6f')
+
+def write_info_file():
+    if not args.evaluate:
+        info = ""
+        for key in args.__dict__:
+            info += str(key) + " : " + str(args.__dict__[key]) + "\n"
+
+        file = open(PATH_SAVE + "info.txt", "w")
+        file.write(info)
+        file.close()
 
 if __name__ == '__main__':
     main()
