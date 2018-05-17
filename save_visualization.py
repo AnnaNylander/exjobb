@@ -53,10 +53,10 @@ def main():
         indices = sorted(indices)
         for i in indices:
             visualize(i, args.prediction, args.everything, folder=folder+'/')
-            print(i)
+            #print(i)
 
 def getIndices(path):
-    path = path + 'test/input/values/'
+    path = path + 'all/input/values/'
     nr_of_files = len(os.listdir(path))
     res = np.zeros([nr_of_files])
     idx = 0
@@ -83,7 +83,7 @@ def plot(x, y ,c , image ,subplot_rows, subplot_cols, subplot_index, title, side
 def visualize(step, prediction, everything, folder=''):
     # if we want prediction but the file doesn't exist, skip and return.
     if prediction:
-        path_pred = PATH_MODELS + 'generated_output/' +folder +  'gen_%i.csv' % step
+        path_pred = PATH_MODELS + 'generated_output/' + folder +  'gen_%i.csv' % step
         if not os.path.isfile(path_pred):
             return
 
@@ -104,14 +104,14 @@ def visualize(step, prediction, everything, folder=''):
     topview_img = topview_img.squeeze()
 
     #past
-    path_input = PATH_DATA + folder + 'test/input/values/input_%i.csv' % step
+    path_input = PATH_DATA + folder + 'all/input/values/input_%i.csv' % step
     values_past = np.genfromtxt(path_input, delimiter=',', skip_header=True)
     past_loc_x = values_past[:,0]
     past_loc_y = values_past[:,1]
     plot_past = plot(past_loc_x, past_loc_y, 'r', topview_img, SUBPLOT_ROWS, SUBPLOT_COLS, 1,'Past and future path',SIDE)
 
     #future
-    path_output = PATH_DATA + folder + 'test/output/output_%i.csv' % step
+    path_output = PATH_DATA + folder + 'all/output/output_%i.csv' % step
     values_future = np.genfromtxt(path_output, delimiter=',', skip_header=True)
     future_loc_x = values_future[:,0]
     future_loc_y = values_future[:,1]

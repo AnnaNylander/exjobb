@@ -1,6 +1,6 @@
 import os
 
-PATH = '/media/annaochjacob/crucial/dataset/fruits/'
+PATH = '/media/annaochjacob/crucial/dataset/eukaryote/train/'
 
 def main():
 

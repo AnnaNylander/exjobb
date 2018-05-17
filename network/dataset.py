@@ -43,9 +43,13 @@ class OurDataset(Dataset):
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
 
         output = output.reshape(60)
-
-        foldername_search= re.search('(?<=dataset\/)\w*\/\w*(?=\/)', str(self.lidars[idx])).group()
-        foldername = re.sub('\/','_',foldername_search)
+        #print(str(self.lidars[idx]))
+        #print(self.indices[idx])
+        foldername_search= re.search('(?<=dataset\/)\w*\/\w*\/\w*\/', str(self.lidars[idx])).group()
+        #print(foldername_search)
+        foldername = re.sub('\/','',foldername_search)
+        foldername = re.sub('train|test|validate','',foldername)
+        foldername = re.sub('eukaryote','',foldername)
 
         return {'indices': self.indices[idx],
                 'lidar': np.stack(lidar, axis=0),

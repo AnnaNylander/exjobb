@@ -90,8 +90,9 @@ if rnn_arch_match is not None:
     args.rnn = True
 
 # find lr and momentum from optimizer settings
-lr_match = re.search('(?<=lr=)\d*e-\d*', args.optim) #TODO remove space ' ' sensitivity
-learning_rate = float(lr_match.group()) if lr_match is not None else 0
+#lr_match = re.search('(?<=lr=)\d*e-\d*', args.optim) #TODO remove space ' ' sensitivity
+lr_match = re.search('(?<=lr=)(.*?)(?=,)', args.optim) # NOTE Fulhack för att klara av t.ex. '3*1e-5'
+learning_rate = float(eval(lr_match.group())) if lr_match is not None else 0
 momentum_match = re.search('(?<=momentum=)\d*\.\d*', args.optim) #TODO remove space ' ' sensitivity
 momentum = float(momentum_match.group()) if momentum_match is not None else 0
 if args.scheduler and (learning_rate == 0 or momentum == 0):
@@ -142,8 +143,8 @@ def main():
         optimizer = eval('torch.optim.' + args.optim)
         if args.scheduler:
             lr_scheduler.setValues(len(dataloader_train)*args.epochs, learning_rate/10, learning_rate)
-            momentum_scheduler.setValues(len(dataloader_train)*args.epochs, momentum, momentum-0.1)
-
+            #momentum_scheduler.setValues(len(dataloader_train)*args.epochs, momentum, momentum-0.1) # NOTE oh fuck.
+            momentum_scheduler.setValues(len(dataloader_train)*args.epochs, momentum+0.05, momentum-0.05)
     #resume from checkpoint
     if args.resume:
         print("----Resume from checkpoint:-----")
@@ -190,9 +191,10 @@ def main():
                     times, dataloader_train, dataloader_val, best_res, all_time_best_res)
 
     # Final evaluation on test dataset
-    #print("_____EVALUATE MODEL______")
-    #test_loss = validate(model, dataloader_test, loss_fn, True)
-    #print("Test loss: %f" %test_loss)
+    if args.evaluate:
+        print("_____EVALUATE MODEL______")
+        test_loss = validate(model, dataloader_test, loss_fn, True)
+        print("Test loss: %f" %test_loss)
 
 def get_data_loader(path, max=-1, shuffle=False, balance=False, sampler_max = None):
     if args.manual_past_frames is None:
@@ -288,7 +290,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                 print_statistics(train_losses, times, len(dataloader_train))
 
             # Evaluate on validation set and save checkpoint
-            if step % args.plot_freq == 0:
+            if step % args.plot_freq == 0 and step != 0:
                 validation_loss = validate(model, dataloader_val, loss_fn)
                 validation_losses.update(epoch + 1, i + 1, step, validation_loss)
                 # Save losses to csv for plotting
@@ -328,6 +330,9 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
 
         validation_loss = validate(model, dataloader_val, loss_fn)
         validation_losses.update(epoch + 1, i + 1, step, validation_loss)
+        # Save losses to csv for plotting
+        save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
+        save_statistic(validation_losses, PATH_SAVE + 'validation_losses.csv')
 
         # Store best loss value
         is_best = validation_loss < best_res
@@ -417,6 +422,7 @@ def generate_output(indices, outputs, foldername, path):
     if not os.path.exists(path):
         os.makedirs(path)
     for i, output in enumerate(outputs):
+        #print(foldername[i])
         subpath = path + str(foldername[i]) + '/'
         if not os.path.exists(subpath):
             os.makedirs(subpath)
