@@ -28,6 +28,8 @@ parser.add_argument('--shuffle', dest='shuffle', action='store_true',
                     help='Whether to shuffle training data or not. (default: False)')
 parser.add_argument('--no-intention', dest='no_intention', action='store_true',
                     help='Set all intentions to 0. (default: False (aka keep intentions))')
+parser.add_argument('--only-lidar', dest='only_lidar', action='store_true',
+                    help='Set all non-lidar values to 0. (default: False)). If False, --no-intention is still valid.')
 parser.add_argument('-b', '--batch-size', default=16, type=int,
                     metavar='N', help='mini-batch size (default: 16)')
 parser.add_argument('-e', '--epochs', default=10, type=int,
@@ -250,7 +252,7 @@ def get_data_loader(path, max=-1, shuffle=False, balance=False, sampler_max = No
         else:
             sampler = None
 
-        dataset = OurDataset(data, args.no_intention)
+        dataset = OurDataset(data, args.no_intention, args.only_lidar)
         return DataLoader(dataset, batch_size=args.batch_size,
                                    shuffle=args.shuffle,
                                    num_workers=NUM_WORKERS,

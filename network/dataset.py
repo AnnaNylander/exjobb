@@ -7,7 +7,7 @@ import torch
 
 class OurDataset(Dataset):
 
-    def __init__(self, dic, no_intention, transform=None):
+    def __init__(self, dic, no_intention, only_lidar, transform=None):
 
         indices = dic.get('indices')
         self.indices = indices
@@ -25,6 +25,7 @@ class OurDataset(Dataset):
         self.categories = categories
 
         self.no_intention = no_intention
+        self.only_lidar = only_lidar
         self.transform = transform
 
     def __len__(self):
@@ -38,7 +39,9 @@ class OurDataset(Dataset):
 
         values = np.genfromtxt(self.values[idx], delimiter=',', skip_header=True)
         values = np.nan_to_num(values)
-        if self.no_intention: # set all intentions to 0
+        if self.only_lidar: # set all values to 0
+            values[:,:] = 0
+        elif self.no_intention: # set all intentions to 0
             values[:,(5,6)] = 0
         output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
 
