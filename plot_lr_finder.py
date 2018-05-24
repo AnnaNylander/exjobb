@@ -1,0 +1,52 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import argparse
+
+parser = argparse.ArgumentParser(description='Plot training progress')
+parser.add_argument('-m','--model', metavar='folder', type=str,
+                    dest='path', default='',
+                    help='Foldername to model where the loss files are stored. Eg. \'LucaNet/\' (with trailing /)')
+parser.add_argument('-s','--save_name', metavar='name', type=str,
+                    dest='name', default='',
+                    help='Name of figure when saved. (default: <epochs trained>_<min_val_loss>.png )')
+parser.add_argument('--ylim', metavar='N', type=int,
+			        dest='ylim', default=100, help='Y-axis positive limit')
+parser.add_argument('-a','--average', metavar='N', type=int,
+			        dest='avg', default=100, help='Moving average window')
+
+
+args = parser.parse_args()
+PATH_BASE = '/media/annaochjacob/crucial/models/'
+
+def moving_average(a, n=100) :
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    #return ret[n - 1:] / n
+    return ret / n
+
+def main():
+    PATH_TRAIN = PATH_BASE +  args.path + 'losses.txt'
+    PATH_LR = PATH_BASE +  args.path + 'log_lrs.txt'
+    train = np.loadtxt(PATH_TRAIN, delimiter=' ')
+    log_lrs = np.loadtxt(PATH_LR, delimiter=' ')
+    #train_values = moving_average(train[:,1], args.avg)
+    #validate_values = moving_average(validate[:,1], args.avg)
+
+    #train_values = train[:,1]
+    #validate_values = validate[:,1]
+    print(train)
+    train_handle = plt.plot(log_lrs, train)
+
+    filename = 'lr_finder_ylim=' + str(args.ylim)
+
+    if args.name:
+        filename=args.name
+
+    axes = plt.gca()
+    axes.set_xlim([0,np.max(train)])
+    axes.set_ylim([0,args.ylim])
+    plt.savefig(PATH_BASE + args.path + filename + '.png')
+    plt.show()
+
+if __name__ == "__main__":
+    main()
