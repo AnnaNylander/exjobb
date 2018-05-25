@@ -120,7 +120,7 @@ def get_input(measurements, intentions, traffic, frame, n_frames, n_steps):
         # Notice the minus signs on y and new_y because of carla's world axes!
         v_rel_x, v_rel_y = get_relative_location(x, -y, yaw, new_x, -new_y)
         acc_x, acc_y, acc_z = measurements[frame_index, [5, 6, 7]]
-        v_forward_acceleration = get_forward_acceleration(acc_x, acc_y, acc_z)
+        v_forward_acceleration = get_total_acceleration(acc_x, acc_y, acc_z)
         v_forward_speed = measurements[frame_index, 8]
         v_steer, v_throttle, v_break = measurements[frame_index, [17, 18, 19]]
 
@@ -171,7 +171,7 @@ def get_relative_location(x, y, yaw, new_x, new_y):
     relative_y = new_y - y
     return relative_x, relative_y
 
-def get_forward_acceleration(acc_x, acc_y, acc_z):
+def get_total_acceleration(acc_x, acc_y, acc_z):
     squares = np.power([acc_x, acc_y, acc_z], 2)
     return np.sqrt(np.sum(squares))
 
@@ -194,12 +194,6 @@ def get_output_header():
     header = 'location_x,'
     header += 'location_y,'
     return header
-
-def rotate(x, y, degrees):
-    radians = np.deg2rad(degrees)
-    c, s = np.cos(radians), np.sin(radians)
-    r = np.matrix([[c, s], [-s, c]])
-    return [x,y]*r
 
 if __name__ == "__main__":
     main()
