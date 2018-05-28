@@ -21,4 +21,6 @@ DATASET=eukaryote/
 #python3 main.py -e 7 -b $BATCH_SIZE -pl $PLOT_FREQ -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar/ -bl --resume ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar/checkpoint.pt
 
 # Curriculum learning with past frames
-python3 main.py --no-intention --only-lidar -e $EPOCHS -b $BATCH_SIZE -pl $PLOT_FREQ -a cnn_bias.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar_past_frames/ -bl -o "Adam( model.parameters(), lr=1e-4, weight_decay=1e-5, amsgrad=True)" -pf 2 -fs 2 #--resume ${FOLDER_NAME}CNNBiasAll_2pf/checkpoint.pt
+#python3 main.py --no-intention --only-lidar -e $EPOCHS -b $BATCH_SIZE -pl $PLOT_FREQ -a cnn_bias.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar_past_frames/ -bl -o "Adam( model.parameters(), lr=1e-4, weight_decay=1e-5, amsgrad=True)" -pf 2 -fs 2 # --resume ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar_past_frames/checkpoint.pt
+#python3 main.py --no-intention --only-lidar -e 3 -b $BATCH_SIZE -pl $PLOT_FREQ -a cnn_bias.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar_past_frames/ -bl -pf 2 -fs 2 --resume ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar_past_frames/checkpoint.pt
+python3 main.py -e 7 -b $BATCH_SIZE -pl $PLOT_FREQ -a cnn_bias.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar_past_frames/ -bl -pf 2 -fs 2 --resume ${FOLDER_NAME}CNNBiasAll_Adam_only_lidar_past_frames/checkpoint.pt
