@@ -199,11 +199,6 @@ def main():
         print("Test loss: %f" %test_loss)
 
 def get_data_loader(path, max=-1, shuffle=False, balance=False, sampler_max = None):
-    if args.manual_past_frames is None:
-        args.manual_past_frames = list(range(args.frame_stride,
-                                             args.frame_stride*args.past_frames+1,
-                                             args.frame_stride))
-
     # We need to load data differently depending on the architecture
     if args.rnn:
         args.manual_past_frames = []
@@ -222,7 +217,12 @@ def get_data_loader(path, max=-1, shuffle=False, balance=False, sampler_max = No
                                    drop_last=True,
                                    sampler=sampler)
 
-    else:
+    else: # not RNN
+        if args.manual_past_frames is None: # TODO flytta upp? konsevenser?
+            args.manual_past_frames = list(range(args.frame_stride,
+                                                 args.frame_stride*args.past_frames+1,
+                                                 args.frame_stride))
+
         data = get_data(path, args.manual_past_frames, max)
 
         if balance:
