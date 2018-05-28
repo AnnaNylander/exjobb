@@ -10,36 +10,37 @@ def trim_to_roi(point_cloud,roi):
     inside_roi = np.max(np.absolute(point_cloud), axis=1) < roi/2
     return point_cloud[inside_roi]
 
-def lidar_to_topview(point_cloud, ROI, CELLS):
-    grid = np.zeros([CELLS,CELLS,1])
+def lidar_to_topview(point_cloud, roi, cells):
+    grid = np.zeros([cells, cells, 1])
 
     for point in point_cloud:
         x, y, z = point
-        x += ROI/2
-        x /= ROI
-        cell_x = (int) (x*CELLS) - 1
+        x += roi/2
+        x /= roi
+        cell_x = (int) (x*cells) - 1
 
-        y += ROI/2
-        y /= ROI
-        cell_y = (int) (y*CELLS) - 1
+        y += roi/2
+        y /= roi
+        cell_y = (int) (y*cells) - 1
 
         grid[cell_x,cell_y] += 1
 
     grid = np.rot90(grid,1)
     return np.uint8(100*grid)
 
-def get_max_elevation(frame, point_cloud, ROI = 60, CELLS = 600):
-    grid = np.full([CELLS,CELLS,1], np.nan)
+def get_max_elevation(frame, point_cloud, roi = 60, cells = 600):
+    point_cloud = trim_to_roi(point_cloud,roi) # Always trim to roi first
+    grid = np.full([cells, cells, 1], np.nan)
 
     for point in point_cloud:
         x, y, z = point
-        x += ROI/2
-        x /= ROI
-        cell_x = (int) (x*CELLS) - 1
+        x += roi/2
+        x /= roi
+        cell_x = (int) (x*cells) - 1
 
-        y += ROI/2
-        y /= ROI
-        cell_y = (int) (y*CELLS) - 1
+        y += roi/2
+        y /= roi
+        cell_y = (int) (y*cells) - 1
 
         element = grid[cell_x,cell_y]
         if np.isnan(element) or element < z:
