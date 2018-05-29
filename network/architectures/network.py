@@ -6,11 +6,17 @@ import numpy
 import torch
 
 class SmallerNetwork2(nn.Module):
-    def __init__(self):
+    def __init__(self, n_past_lidars, n_past_steps, n_future_steps):
         super(SmallerNetwork2, self).__init__()
 
+        # Change these values if you want to change the number of steps in the
+        # input or output
+        self.values_width = 11 # the number of values on each row in values
+        self.vs = (n_past_steps + 1) * self.values_width # values size
+        self.os = n_future_steps * 2 # output size
+
         #encoder
-        self.conv0 = nn.Conv2d(1,8,3, padding=1) # with elu #twice!
+        self.conv0 = nn.Conv2d(n_past_lidars+1,8,3, padding=1) # with elu #twice!
         self.conv1 = nn.Conv2d(8,8,3, padding=1)
         self.maxpool1 = nn.MaxPool2d(2, stride=2)
         self.conv2 = nn.Conv2d(8,16,3, padding=1) # with elu
@@ -42,9 +48,9 @@ class SmallerNetwork2(nn.Module):
 
         #decoder #all followed by elu
         #concatenate new values here
-        self.Linear1 = nn.Linear(10330,800) # add more data here
+        self.Linear1 = nn.Linear(25*25*16 + self.vs, 800)
         self.Linear2 = nn.Linear(800, 300)
-        self.Linear3 = nn.Linear(300, 60)
+        self.Linear3 = nn.Linear(300, self.os)
 
     def forward(self, l, v): # 600 x 600 x 1
         # encoder
@@ -78,7 +84,7 @@ class SmallerNetwork2(nn.Module):
 
         # decoder
         l = l.view(-1, 25*25*16) # 10000
-        v = v.view(-1, 30*11)
+        v = v.view(-1, (self.n_past_steps+1) *self.values_width)
         x = torch.cat((l,v),1) # 10330
         x = F.elu(self.Linear1(x)) # 800
         x = F.elu(self.Linear2(x)) # 300
@@ -87,11 +93,17 @@ class SmallerNetwork2(nn.Module):
         return x
 
 class SmallerNetwork1(nn.Module):
-    def __init__(self):
+    def __init__(self, n_past_lidars, n_past_steps, n_future_steps):
         super(SmallerNetwork1, self).__init__()
 
+        # Change these values if you want to change the number of steps in the
+        # input or output
+        self.values_width = 11 # the number of values on each row in values
+        self.vs = (n_past_steps + 1) * self.values_width # values size
+        self.os = n_future_steps * 2 # output size
+
         #encoder
-        self.conv0 = nn.Conv2d(1,4,3, padding=1)
+        self.conv0 = nn.Conv2d(n_past_lidars+1,4,3, padding=1)
         self.conv1 = nn.Conv2d(4,4,3, padding=1)
         self.conv2 = nn.Conv2d(4,8,3, padding=1)
         self.conv3 = nn.Conv2d(8,8,3, padding=1)
@@ -115,9 +127,9 @@ class SmallerNetwork1(nn.Module):
 
         #decoder #all followed by elu
         #concatenate new values here
-        self.Linear1 = nn.Linear(18826,540) # add more data here
+        self.Linear1 = nn.Linear(18826,540)
         self.Linear2 = nn.Linear(540,256)
-        self.Linear3 = nn.Linear(256, 60)
+        self.Linear3 = nn.Linear(256, self.os)
 
     def forward(self, l, v): # 600 x 600 x 1
         # encoder
@@ -142,7 +154,7 @@ class SmallerNetwork1(nn.Module):
 
         #decoder
         l = l.view(-1, 34*34*16) # 18496
-        v = v.view(-1, 30*11)
+        v = v.view(-1, (self.n_past_steps+1) * self.values_width)
         x = torch.cat((l,v),1) # 18826
         x = F.elu(self.Linear1(x)) # 540
         x = F.elu(self.Linear2(x)) # 256
@@ -151,11 +163,17 @@ class SmallerNetwork1(nn.Module):
         return x
 
 class LucaNetwork(nn.Module):
-    def __init__(self):
+    def __init__(self, n_past_lidars, n_past_steps, n_future_steps):
         super(LucaNetwork, self).__init__()
 
+        # Change these values if you want to change the number of steps in the
+        # input or output
+        self.values_width = 11 # the number of values on each row in values
+        self.vs = (n_past_steps + 1) * self.values_width # values size
+        self.os = n_future_steps * 2 # output size
+
         #encoder
-        self.conv0 = nn.Conv2d(1,8,3, padding=1) # with elu #twice!
+        self.conv0 = nn.Conv2d(n_past_lidars+1,8,3, padding=1) # with elu #twice!
         self.conv1 = nn.Conv2d(8,8,3, padding=1)
         self.maxpool1 = nn.MaxPool2d(2, stride=2)
         self.conv2 = nn.Conv2d(8,16,3, padding=1) # with elu
@@ -185,7 +203,7 @@ class LucaNetwork(nn.Module):
         self.Linear1 = nn.Linear(360330,1000) # add more data here
         self.Linear2 = nn.Linear(1000,500)
         self.Linear3 = nn.Linear(500, 500)
-        self.Linear4 = nn.Linear(500, 60)
+        self.Linear4 = nn.Linear(500, self.os)
 
     def forward(self, l, v): # 600 x 600 x 1
         # encoder
@@ -213,7 +231,7 @@ class LucaNetwork(nn.Module):
 
         # decoder
         l = l.view(-1, 150*150*16) # 360000
-        v = v.view(-1, 30*11)
+        v = v.view(-1, (self.n_past_steps+1) * self.values_width)
         x = torch.cat((l,v),1) # 360330
         x = F.elu(self.Linear1(x)) # 5000
         x = F.elu(self.Linear2(x)) # 1000

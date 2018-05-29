@@ -8,8 +8,9 @@ import torch
 PRINT = True
 
 class CNNBiasAll(nn.Module):
-    ''' Adds a bias to all convolution layers '''
-    def __init__(self, n_past_lidars, n_past_steps, n_future_steps):
+    ''' Adds a bias to all convolution layers, where c is a channel multiplier,
+    i.e. multiplying the number of channels by a factor c'''
+    def __init__(self, n_past_lidars, n_past_steps, n_future_steps, c):
         super(CNNBiasAll, self).__init__()
 
         # Change these values if you want to change the number of steps in the
@@ -17,76 +18,76 @@ class CNNBiasAll(nn.Module):
         values_width = 11 # the number of values on each row in values
         self.vs = (n_past_steps + 1) * values_width # values size
         self.os = n_future_steps * 2 # output size
+        self.c = c
 
         # encoder
-        self.conv_e0 = nn.Conv2d(n_past_lidars+1, 8, 3, padding=1)
-        self.bias_e0 = nn.Linear(self.vs, 8 ) # 330 x 8
+        self.conv_e0 = nn.Conv2d(n_past_lidars+1, 8*c, 3, padding=1)
+        self.bias_e0 = nn.Linear(self.vs, 8*c )
 
-        self.conv_e1 = nn.Conv2d(8,8,3, padding=1)
-        self.bias_e1 = nn.Linear(self.vs, 8 ) # 330 x 8
+        self.conv_e1 = nn.Conv2d(8*c,8*c, 3, padding=1)
+        self.bias_e1 = nn.Linear(self.vs, 8*c )
         self.maxpool_e1 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_e2 = nn.Conv2d(8,16,3, padding=1)
-        self.bias_e2 = nn.Linear(self.vs, 16 ) # 330 x 8
+        self.conv_e2 = nn.Conv2d(8*c, 16*c, 3, padding=1)
+        self.bias_e2 = nn.Linear(self.vs, 16*c )
 
-        self.conv_e3 = nn.Conv2d(16,16,3, padding=1)
-        self.bias_e3 = nn.Linear(self.vs, 16 ) # 330 x 8
+        self.conv_e3 = nn.Conv2d(16*c, 16*c, 3, padding=1)
+        self.bias_e3 = nn.Linear(self.vs, 16*c )
         self.maxpool_e3 = nn.MaxPool2d(2, stride=2)
 
         # context modules
         self.spatial_dropout = nn.Dropout2d(p=0.2)
 
-        self.conv_c0 = nn.Conv2d(16,96,3, padding=1, dilation=1)
-        self.bias_c0 = nn.Linear(self.vs,96 ) # 330 x 8
+        self.conv_c0 = nn.Conv2d(16*c ,96*c ,3, padding=1, dilation=1)
+        self.bias_c0 = nn.Linear(self.vs, 96*c)
 
-        self.conv_c1 = nn.Conv2d(96,96,3, padding=1, dilation=1)
-        self.bias_c1 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c1 = nn.Conv2d(96*c, 96*c, 3, padding=1, dilation=1)
+        self.bias_c1 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c2 = nn.Conv2d(96,96,3, padding=(2,1), dilation=(2,1))
-        self.bias_c2 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c2 = nn.Conv2d(96*c ,96*c, 3, padding=(2,1), dilation=(2,1))
+        self.bias_c2 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c3 = nn.Conv2d(96,96,3, padding=(4,2), dilation=(4,2))
-        self.bias_c3 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c3 = nn.Conv2d(96*c, 96*c, 3, padding=(4,2), dilation=(4,2))
+        self.bias_c3 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c4 = nn.Conv2d(96,96,3, padding=(8,4), dilation=(8,4))
-        self.bias_c4 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c4 = nn.Conv2d(96*c, 96*c, 3, padding=(8,4), dilation=(8,4))
+        self.bias_c4 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c5 = nn.Conv2d(96,96,3, padding=(12,8), dilation=(12,8))
-        self.bias_c5 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c5 = nn.Conv2d(96*c ,96*c ,3, padding=(12,8), dilation=(12,8))
+        self.bias_c5 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c6 = nn.Conv2d(96,96,3, padding=(16,12), dilation=(16,12))
-        self.bias_c6 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c6 = nn.Conv2d(96*c, 96*c, 3, padding=(16,12), dilation=(16,12))
+        self.bias_c6 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c7 = nn.Conv2d(96,96,3, padding=(20,16), dilation=(20,16))
-        self.bias_c7 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c7 = nn.Conv2d(96*c, 96*c, 3, padding=(20,16), dilation=(20,16))
+        self.bias_c7 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c8 = nn.Conv2d(96,96,3, padding=(24,20), dilation=(24,20))
-        self.bias_c8 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c8 = nn.Conv2d(96*c, 96*c, 3, padding=(24,20), dilation=(24,20))
+        self.bias_c8 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c9 = nn.Conv2d(96,96,3, padding=(28,24), dilation=(28,24))
-        self.bias_c9 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c9 = nn.Conv2d(96*c, 96*c, 3, padding=(28,24), dilation=(28,24))
+        self.bias_c9 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c10 = nn.Conv2d(96,96,3, padding=(32,28), dilation=(32,28))
-        self.bias_c10 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c10 = nn.Conv2d(96*c, 96*c, 3, padding=(32,28), dilation=(32,28))
+        self.bias_c10 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c11 = nn.Conv2d(96,96,3, padding=(1,32), dilation=(1,32))
-        self.bias_c11 = nn.Linear(self.vs, 96 ) # 330 x 8
+        self.conv_c11 = nn.Conv2d(96*c, 96*c, 3, padding=(1,32), dilation=(1,32))
+        self.bias_c11 = nn.Linear(self.vs, 96*c )
 
-        self.conv_c12 = nn.Conv2d(96,16,3, padding=1, dilation=1)
-        self.bias_c12 = nn.Linear(self.vs, 16 ) # 330 x 8
+        self.conv_c12 = nn.Conv2d(96*c, 16*c, 3, padding=1, dilation=1)
+        self.bias_c12 = nn.Linear(self.vs, 16*c )
 
         # decoder convolutions # 150 x 150 x 16
-        self.conv_d0 = nn.Conv2d(16,16,3, padding=1)
-        self.bias_d0 = nn.Linear(self.vs, 16 ) # 330 x 8
+        self.conv_d0 = nn.Conv2d(16*c, 16*c, 3, padding=1)
+        self.bias_d0 = nn.Linear(self.vs, 16*c )
         self.maxpool_d0 = nn.MaxPool2d(3, stride=3)            # 50 x 50 x 16
 
-        self.conv_d1 = nn.Conv2d(16,16,3, padding=1)
-        self.bias_d1 = nn.Linear(self.vs, 16 ) # 330 x 8
+        self.conv_d1 = nn.Conv2d(16*c ,16*c, 3, padding=1)
+        self.bias_d1 = nn.Linear(self.vs, 16*c )
         self.maxpool_d1 = nn.MaxPool2d(2, stride=2)            # 25 x 25 x 16
 
         # fully connected decoder layers to output
-        #self.linear_d2 = nn.Linear(10330,800)
-        self.linear_d2 = nn.Linear(25*25*16 + self.vs, 800)
+        self.linear_d2 = nn.Linear(25*25*16*c + self.vs, 800)
         self.linear_d3 = nn.Linear(800, 300)
         self.linear_d4 = nn.Linear(300, self.os)
 
@@ -193,7 +194,7 @@ class CNNBiasAll(nn.Module):
         l = self.maxpool_d1(l)                                  # [2, 16, 25, 25]
 
         # fully connected decoder layers to output
-        l = l.view(-1, 25*25*16)                            # 10000
+        l = l.view(-1, 25*25*16*self.c)                           # 10000
         y = torch.cat((l,v),1)                              # 10330
         y = F.elu(self.linear_d2(y))                          # 800
         y = F.elu(self.linear_d3(y))                          # 300
