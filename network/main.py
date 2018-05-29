@@ -153,7 +153,12 @@ def main():
     # create new model and lossfunctions and stuff
     if not args.resume:
         print("-----Creating network-----")
-        model = eval(args.arch + "()")
+        n_ipf = str(len(args.input_past_frames))
+        n_off = str(len(args.output_future_frames))
+        n_mpf = str(len(args.manual_past_frames))
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off
+        print(model_arg_string)
+        model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
 
@@ -174,7 +179,16 @@ def main():
         # model
         print("\t Creating network")
         args.arch = checkpoint['arch']
-        model = eval(args.arch + "()")
+        args.past_frames = checkpoint['past_frames']
+        args.frame_stride = checkpoint['frame_stride']
+        args.manual_past_frames = checkpoint['manual_past_frames']
+        args.input_past_frames = checkpoint['input_past_frames']
+        args.output_future_frames = checkpoint['output_future_frames']
+        n_ipf = str(len(args.input_past_frames))
+        n_off = str(len(args.output_future_frames))
+        n_mpf = str(len(args.manual_past_frames))
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off
+        model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
         # loss function and optimizer
@@ -185,9 +199,6 @@ def main():
 
         #load variables
         print("\t Loading variables")
-        args.past_frames = checkpoint['past_frames']
-        args.frame_stride = checkpoint['frame_stride']
-        args.manual_past_frames = checkpoint['manual_past_frames'] if ('manual_past_frames' in checkpoint) else ''
         epoch_start = checkpoint['epoch']
         step_start = checkpoint['step']
         model.load_state_dict(checkpoint['state_dict'])
@@ -320,6 +331,8 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                     'past_frames': args.past_frames,
                     'frame_stride': args.frame_stride,
                     'manual_past_frames': args.manual_past_frames,
+                    'input_past_frames' : args.input_past_frames,
+                    'output_future_frames': args.output_future_frames,
                     'epoch': epoch + 1,
                     'step' : step + 1,
                     'state_dict': model.state_dict(),
@@ -357,6 +370,8 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             'past_frames': args.past_frames,
             'frame_stride': args.frame_stride,
             'manual_past_frames': args.manual_past_frames,
+            'input_past_frames' : args.input_past_frames,
+            'output_future_frames': args.output_future_frames,
             'epoch': epoch + 1,
             'step' : step + 1,
             'state_dict': model.state_dict(),
@@ -430,14 +445,9 @@ def validate(model, dataloader, loss_fn, save_output=False):
     return losses.avg
 
 def generate_output(indices, outputs, foldername, path):
-    print(indices)
-    print(path)
-    print(foldername)
     if not os.path.exists(path):
         os.makedirs(path)
     for i, output in enumerate(outputs):
-        print(i, output)
-        print(foldername[i])
         #print(foldername[i])
         subpath = path + str(foldername[i]) + '/'
         if not os.path.exists(subpath):
