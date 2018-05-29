@@ -4,63 +4,109 @@ import re
 from torch.utils.data import Dataset, DataLoader
 from torch.autograd import Variable
 import torch
+import util
 
 class OurDataset(Dataset):
 
-    def __init__(self, dic, no_intention, only_lidar, transform=None):
+    def __init__(self, data_path, data, no_intention, only_lidar, past_lidars, past_idxs, future_idxs, transform=None):
+        """ past_idxs and future_idxs must work like manual_past_frames """
 
-        indices = dic.get('indices')
-        self.indices = indices
+        self.data = data
+        global_indices = []
 
-        lidars = dic.get('lidar')
-        self.lidars =  lidars
+        for folder in data:
+            length = len(data[folder]['indices'])
+            min_frame = max(past_idxs)
+            max_frame = length-1 - max(future_idxs)
+            global_indices = global_indices + [(i,folder) for i in range(min_frame,max_frame+1)]
 
-        values = dic.get('values')
-        self.values = values
+        categories = []
+        for idx, folder in global_indices:
+            values = data[folder]['values'][idx]
+            categories = categories + [int(values[12])] # get categories for all rows
 
-        outputs = dic.get('output')
-        self.outputs = outputs
-
-        categories = dic.get('category')
         self.categories = categories
-
+        self.data_path = data_path
+        self.global_indices = global_indices
         self.no_intention = no_intention
         self.only_lidar = only_lidar
+        self.past_idxs = past_idxs
+        self.past_lidars = past_lidars
+        self.future_idxs = future_idxs
         self.transform = transform
 
     def __len__(self):
-        return len(self.indices)
+        return len(self.global_indices)
 
-    def __getitem__(self, idx):
-        lidar = []
-        for l in self.lidars[idx]:
-            temp = np.genfromtxt(l, delimiter=',')
-            lidar.append(temp)
+    def __getitem__(self, global_index):
+        (idx, folder) = self.global_indices[global_index]
 
-        values = np.genfromtxt(self.values[idx], delimiter=',', skip_header=True)
+        # Fetch lidar data.
+        lidar = self.get_lidar(idx, folder, self.past_lidars)
+
+        # Fetch values data (input)
+        values = self.get_values(idx, folder, self.past_idxs)
+
+        #Fetch output data (output)
+        output = self.get_output(idx, folder, self.future_idxs)
+
+        return {'index': idx,
+                'lidar': lidar,
+                'value': values,
+                'output': output,
+                'foldername': folder}
+
+    def get_lidar(self, idx, folder, past_lidars):
+        path = self.data_path + folder + '/max_elevation/'
+
+        lidars = []
+        for i in [0] + past_lidars: # 0 is current frame
+            index = idx-i
+            lidar = np.genfromtxt(path + 'me_%i.csv' %index, delimiter=',')
+            lidars.append(lidar)
+
+        lidars = np.stack(lidars, axis=0)
+        return lidars
+
+    def get_values(self, idx, folder, past_idxs):
+        data = self.data[folder]['values']
+
+        current_frame = data[idx]
+        x, y, yaw = current_frame[[0,1,2]]
+
+        current_frame = np.reshape(current_frame,(1,-1))
+        past_frames = data[idx - np.array(past_idxs),:]
+        values = np.concatenate((current_frame, past_frames))
+        values = values[:, 0:12] # Remove category column if present
         values = np.nan_to_num(values)
+        w_coord = np.transpose(values[:,[0,1]])
+
+        r_coord = util.world_to_relative(x, y, yaw, w_coord)
+        values[:,[0,1]] = r_coord.transpose()
+        values = np.delete(values,2,1)
+
         if self.only_lidar: # set all values to 0
             values[:,:] = 0
         elif self.no_intention: # set all intentions to 0
             values[:,(5,6)] = 0
-        output = np.genfromtxt(self.outputs[idx], delimiter=',', skip_header=True)
 
-        output = output.reshape(60)
-        #print(str(self.lidars[idx]))
-        #print(self.indices[idx])
-        foldername_search= re.search('(?<=dataset\/)\w*\/\w*\/\w*\/', str(self.lidars[idx])).group()
-        #print(foldername_search)
-        foldername = re.sub('\/','',foldername_search)
-        foldername = re.sub('train|test|validate','',foldername)
-        foldername = re.sub('eukaryote','',foldername)
+        return values
 
-        return {'indices': self.indices[idx],
-                'lidar': np.stack(lidar, axis=0),
-                'value': values,
-                'output': output,
-                'foldername': foldername,
-                'category': self.categories[idx]}
+    def get_output(self, idx, folder, future_idxs):
+        data = self.data[folder]['values']
 
+        current_frame = data[idx]
+        x, y, yaw = current_frame[[0,1,2]]
+
+        values = data[idx + np.array(future_idxs), :]
+        values = values[:, [0,1]] # Keep only x and y
+        values = np.nan_to_num(values)
+        w_coord = np.transpose(values)
+
+        r_coord = util.world_to_relative(x, y, yaw, w_coord)
+
+        # Return relative coordinates as a 1xSteps array (e.g. [x0,x1,x2,y0,y1,y2])
+        return r_coord.reshape(-1)
 
 class RNNDataset(Dataset):
 

@@ -7,7 +7,6 @@ import time
 import os
 import re
 import shutil
-import matplotlib.pyplot as plt
 from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SequentialSampler, WeightedRandomSampler
@@ -44,7 +43,7 @@ parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--scheduler', dest='scheduler', action='store_true',
                     help='Whether to manually adjust learning rate as we train. (https://sgugger.github.io/the-1cycle-policy.html)')
-parser.add_argument('-d','--dataset', dest='dataset_path', default='',
+parser.add_argument('-d','--dataset', dest='dataset_name', default='',
                     type=str, metavar='PATH',
                     help = 'Name of folder in /media/annaochjacob/crucial/dataset/ ex \'Banana_split/\' (with trailing /)')
 parser.add_argument('-s','--save-path', dest='save_path', default='',
@@ -62,6 +61,15 @@ parser.add_argument('-fs', '--frame-stride', default=1, type=int, dest='frame_st
 parser.add_argument('-mpf','--manual_past_frames', default=None, type=str, metavar='\'1 2 3\'',
                     help = 'If not use past_frames and frames-stride, list which frames you want manually. Ex: \'1 3 5 7 10 13 16\''\
                     'NOTE: Not applicable for RNNs!! Use -pf and -fs flags instead.')
+
+parser.add_argument('-ipf','--input_past_frames', default=None, type=str, metavar='\'1 2 3\'',
+                    help = 'Which input past frames we want to use. (Instead of using 30 always) \
+                    List which frames you want manually. Ex: \'1 3 5 7 10 13 16\''\
+                    'NOTE: Do not inclue 0.')
+parser.add_argument('-off','--output_future_frames', default=None, type=str, metavar='\'1 2 3\'',
+                    help = 'Which output future frames we want to use as target. (Instead of using 30 always) \
+                    List which frames you want manually. Ex: \'1 3 5 7 10 13 16\''\
+                    'NOTE: Do not include 0.')
 # NOTE not used at the moment
 #parser.add_argument('-bptt', '--bptt', default=1, type=int, dest='bptt',
 #                    metavar='N', help='Back propagation through time. Option only available for RNNs. (default = 1)')
@@ -72,20 +80,30 @@ parser.add_argument('-bl', '--balance', dest='balance', action='store_true',
                     help='Balance dataset by sampling with replacement. Not applicable for RNNs. Forces shuffle to True in training set.')
 #parser.add_argument('-t', '--timeout', default=60*6, type=int, dest='timeout',
 #                    metavar='N', help='Maximum number of minutes to train. (default = 360)')
+# TODO
 
-#TODO: data_to_dict, dataset, main.
-# save, load,
 args = parser.parse_args()
 
 PATH_BASE = '/media/annaochjacob/crucial/'
 PATH_RESUME = PATH_BASE + 'models/' + args.resume
 PATH_SAVE = PATH_BASE + 'models/' + args.save_path
-PATH_DATA = PATH_BASE + 'dataset/' + args.dataset_path
+PATH_DATA = PATH_BASE + 'dataset/' + args.dataset_name
 NUM_WORKERS = 3
 PIN_MEM = False
 
+if args.input_past_frames:
+    args.input_past_frames = [int(i) for i in args.input_past_frames.split(' ')]
+
+if args.output_future_frames:
+    args.output_future_frames = [int(i) for i in args.output_future_frames.split(' ')]
+
 if args.manual_past_frames:
     args.manual_past_frames = [int(i) for i in args.manual_past_frames.split(' ')]
+
+if args.manual_past_frames is None:
+    args.manual_past_frames = list(range(args.frame_stride,
+                                         args.frame_stride*args.past_frames+1,
+                                         args.frame_stride))
 
 rnn_arch_match = re.search('RNN', args.arch, flags=re.IGNORECASE)
 if rnn_arch_match is not None:
@@ -128,9 +146,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance) # ca 232.500 frames in total
-        dataloader_val = get_data_loader(PATH_DATA + 'validate/', max=4000, shuffle=False, balance=False) # ca 35.000 frames in total in 4 subsets (validation set has only one category)
-    dataloader_test = get_data_loader(PATH_DATA + 'test/', max=-1, shuffle = False, balance=False)  # ca 66.200 frames in total in 8 subsets
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance, sampler_max = 500)
+        dataloader_val = get_data_loader(PATH_DATA + 'train/', shuffle=False, balance=False, sampler_max=100)
+    dataloader_test = get_data_loader(PATH_DATA + 'train/', shuffle = False, balance=False, sampler_max=100)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -145,7 +163,6 @@ def main():
         optimizer = eval('torch.optim.' + args.optim)
         if args.scheduler:
             lr_scheduler.setValues(len(dataloader_train)*args.epochs, learning_rate/10, learning_rate)
-            #momentum_scheduler.setValues(len(dataloader_train)*args.epochs, momentum, momentum-0.1) # NOTE oh fuck.
             momentum_scheduler.setValues(len(dataloader_train)*args.epochs, momentum+0.05, momentum-0.05)
     #resume from checkpoint
     if args.resume:
@@ -198,13 +215,13 @@ def main():
         test_loss = validate(model, dataloader_test, loss_fn, True)
         print("Test loss: %f" %test_loss)
 
-def get_data_loader(path, max=-1, shuffle=False, balance=False, sampler_max = None):
+def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
+
     if args.rnn:
         args.manual_past_frames = []
         # TODO Remove max arg
         data = get_data(path, args.manual_past_frames, -1)
-
         dataset = RNNDataset(data, args.no_intention,
                                 bptt=args.past_frames+1,
                                 frame_stride=args.frame_stride)
@@ -217,47 +234,39 @@ def get_data_loader(path, max=-1, shuffle=False, balance=False, sampler_max = No
                                    drop_last=True,
                                    sampler=sampler)
 
-    else: # not RNN
-        if args.manual_past_frames is None: # TODO flytta upp? konsevenser?
-            args.manual_past_frames = list(range(args.frame_stride,
-                                                 args.frame_stride*args.past_frames+1,
-                                                 args.frame_stride))
+    # NOT RNN
+    data = get_data(path, args.manual_past_frames)
+    dataset = OurDataset(path, data, args.no_intention, args.only_lidar, args.manual_past_frames, args.input_past_frames, args.output_future_frames)
 
-        data = get_data(path, args.manual_past_frames, max)
+    categories = numpy.array(dataset.categories)
+    weights = [1]*len(categories)
+    replacement = False
 
-        if balance:
-            # calculate weights for balancing categories
-            array = data['category']
-            category_count = dict([(category, len(array[numpy.where(array == category)])) for category in numpy.unique(array)])
-            print(category_count)
-            equal_weight = 1/len(category_count)
+    # calculate weights for balancing categories
+    if balance:
+        category_count = dict([(category, len(categories[numpy.where(categories == category)])) for category in numpy.unique(categories)])
+        equal_weight = 1/len(category_count)
+        # Here we can set the probability for each category to be included in a batch.
+        # Do not necessarily have to sum to 1
+        rel_weights = {0: 1, # straight
+                        1: 1, # right intention
+                        2: 1, # left intention
+                        3: 1, # right
+                        4: 1, # left
+                        5: 0, # other
+                        6: 1  # traffic light
+                        }
+        weights = [(equal_weight*rel_weights[x])/(category_count[x]) for x in categories]
+        replacement = True
 
-            # Here we can set the probability for each category to be included in a batch.
-            # Do not necessarily have to sum to 1
-            rel_weights = {'left': 1,
-                            'right': 1,
-                            'left_intention': 1,
-                            'right_intention': 1,
-                            'straight': 1,
-                            'traffic_light': 1,
-                            'other': 0
-                            }
-            weights = [(equal_weight*rel_weights[x])/(category_count[x]) for x in array]
-            if sampler_max is None:
-                sampler_max = len(array)
+    if sampler_max is None: sampler_max = len(array)
+    sampler = WeightedRandomSampler(weights, sampler_max, replacement=replacement)
 
-            sampler = WeightedRandomSampler(weights, len(array), replacement=True)
-            args.shuffle = False
-
-        else:
-            sampler = None
-
-        dataset = OurDataset(data, args.no_intention, args.only_lidar)
-        return DataLoader(dataset, batch_size=args.batch_size,
-                                   shuffle=args.shuffle,
-                                   num_workers=NUM_WORKERS,
-                                   pin_memory=PIN_MEM,
-                                   sampler=sampler)
+    return DataLoader(dataset, batch_size=args.batch_size,
+                               shuffle=args.shuffle,
+                               num_workers=NUM_WORKERS,
+                               pin_memory=PIN_MEM,
+                               sampler=sampler)
 
 def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                 momentum_scheduler, loss_fn, train_losses,
@@ -396,7 +405,7 @@ def validate(model, dataloader, loss_fn, save_output=False):
         lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor))#,volatile=True)
         values = Variable((batch['value']).type(torch.cuda.FloatTensor))#,volatile=True)
         targets = Variable((batch['output']).type(torch.cuda.FloatTensor))#,volatile=True)
-        indices = batch['indices']
+        indices = batch['index']
 
         # Run model and calculate loss
         output = model(lidars, values)
@@ -421,9 +430,14 @@ def validate(model, dataloader, loss_fn, save_output=False):
     return losses.avg
 
 def generate_output(indices, outputs, foldername, path):
+    print(indices)
+    print(path)
+    print(foldername)
     if not os.path.exists(path):
         os.makedirs(path)
     for i, output in enumerate(outputs):
+        print(i, output)
+        print(foldername[i])
         #print(foldername[i])
         subpath = path + str(foldername[i]) + '/'
         if not os.path.exists(subpath):
@@ -434,11 +448,9 @@ def generate_output(indices, outputs, foldername, path):
                         header='x,y')
 
 def save_checkpoint(state, is_best, is_all_time_best,
-        filename = PATH_SAVE + 'checkpoint.pt'):
+                    filename = PATH_SAVE + 'checkpoint.pt'):
     torch.save(state, filename)
-    #if is_best:
-    #    print("Best so far!")
-    #    shutil.copyfile(filename, PATH_SAVE + 'best.pt')
+
     if is_all_time_best:
         print("ALL TIME BEST! GOOD JOB!")
         shutil.copyfile(filename, PATH_SAVE + 'all_time_best.pt')
