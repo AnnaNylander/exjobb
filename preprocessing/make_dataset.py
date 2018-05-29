@@ -8,10 +8,10 @@ import time
 parser = argparse.ArgumentParser(description='Create input and output files from recorded data')
 parser.add_argument('-s','--save-path', metavar='path',
                     dest='save_path', default='dataset/',
-                    help='Foldername in /media/annaochjacob/crucial/dataset/ ex \'dataset_2018_03_14/\' (with trailing /)')
+                    help='Foldername in /media/annaochjacob/crucial/dataset/ ex \'flexible/train/apple/\' (with trailing /)')
 parser.add_argument('-d','--data-path', metavar='path',
                     dest='data_path', default='recorded_data/',
-                    help='Foldername in /media/annaochjacob/crucial/recorded_data/ ex \'recorded_data_2018_03_14/\' (with trailing /)')
+                    help='Foldername in /media/annaochjacob/crucial/recorded_data/carla/ ex \'train/apple/\' (with trailing /)')
 parser.add_argument('-c', dest='include_categories', action='store_true',
                     help='Adds category column to output file if true. Default False.')
 parser.add_argument('-m', dest='create_max_elevation', action='store_true',
