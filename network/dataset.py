@@ -13,17 +13,16 @@ class OurDataset(Dataset):
 
         self.data = data
         global_indices = []
-
         for folder in data:
             length = len(data[folder]['indices'])
             min_frame = max(past_idxs)
             max_frame = length-1 - max(future_idxs)
             global_indices = global_indices + [(i,folder) for i in range(min_frame,max_frame+1)]
 
-        categories = []
-        for idx, folder in global_indices:
+        categories = np.zeros(len(global_indices))
+        for i, (idx, folder) in enumerate(global_indices):
             values = data[folder]['values'][idx]
-            categories = categories + [int(values[12])] # get categories for all rows
+            categories[i] = int(values[12]) # get categories for all rows
 
         self.categories = categories
         self.data_path = data_path
