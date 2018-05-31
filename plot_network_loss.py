@@ -39,7 +39,7 @@ def main():
     train_handle = plt.plot(train[:,0], train_values, label="Training loss")
     validate_handle = plt.plot(validate[:,0], validate_values, label="Validation loss")
 
-    filename = 'batchTrained=' + str(len(train_values)) + '_valLoss=' + str(min(validate_values)) + '_ylim=' + str(args.ylim)
+    filename = 'batchesTrained=' + str(len(train_values)) + '_valLoss=' + str(min(validate_values)) + '_ylim=' + str(args.ylim)
 
     if args.name:
         filename=args.name
@@ -48,7 +48,7 @@ def main():
     axes.set_xlim([0,np.max(train[:,0])])
     axes.set_ylim([0,args.ylim])
     plt.savefig(PATH_BASE + args.path + filename + '.png')
-    plt.show()
+    #plt.show()
 
 if __name__ == "__main__":
     main()
