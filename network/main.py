@@ -15,12 +15,14 @@ from architectures import *
 from data_to_dict import get_data
 from dataset import OurDataset, RNNDataset
 from scheduler import Scheduler
+from settings import Settings
 #from architectures.network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
 from result_meter import ResultMeter
 
 # NOTE! Validate during traning. Test is last when model finished traning.
 
 parser = argparse.ArgumentParser(description='PyTorch Drive a car wohoo')
+
 parser.add_argument('-a','--arch', default='', type=str, metavar='file.class',
                     help = 'Name of network to use. eg: LucaNetwork.LucaNet')
 parser.add_argument('--shuffle', dest='shuffle', action='store_true',
@@ -120,10 +122,12 @@ if args.scheduler and (learning_rate == 0 or momentum == 0):
         Learning rate is " + str(learning_rate) + " and momentum is " + str(momentum) )
 
 def main():
+
     #write info file
     if not os.path.exists(PATH_SAVE):
             os.makedirs(PATH_SAVE)
     write_info_file()
+
     # variables
     best_res = 1000000 #big number
     epoch_start = 0
@@ -146,9 +150,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance, sampler_max = 500)
-        dataloader_val = get_data_loader(PATH_DATA + 'train/', shuffle=False, balance=False, sampler_max=100)
-    dataloader_test = get_data_loader(PATH_DATA + 'train/', shuffle = False, balance=False, sampler_max=100)
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance)
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False)
+    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -157,7 +161,6 @@ def main():
         n_off = str(len(args.output_future_frames))
         n_mpf = str(len(args.manual_past_frames))
         model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off
-        print(model_arg_string)
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
@@ -228,7 +231,6 @@ def main():
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
-
     if args.rnn:
         args.manual_past_frames = []
         # TODO Remove max arg
@@ -248,7 +250,6 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # NOT RNN
     data = get_data(path, args.manual_past_frames)
     dataset = OurDataset(path, data, args.no_intention, args.only_lidar, args.manual_past_frames, args.input_past_frames, args.output_future_frames)
-
     categories = numpy.array(dataset.categories)
     weights = [1]*len(categories)
     replacement = False
@@ -270,7 +271,7 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
         weights = [(equal_weight*rel_weights[x])/(category_count[x]) for x in categories]
         replacement = True
 
-    if sampler_max is None: sampler_max = len(array)
+    if sampler_max is None: sampler_max = len(weights)
     sampler = WeightedRandomSampler(weights, sampler_max, replacement=replacement)
 
     return DataLoader(dataset, batch_size=args.batch_size,
@@ -452,7 +453,7 @@ def generate_output(indices, outputs, foldername, path):
         subpath = path + str(foldername[i]) + '/'
         if not os.path.exists(subpath):
             os.makedirs(subpath)
-        output = output.view(-1,2)
+        output = output.view(2,-1).transpose(0,1)
         filename = subpath + 'gen_%i.csv' %(int(indices[i]))
         numpy.savetxt(filename, output, comments='', delimiter=',',fmt='%.8f',
                         header='x,y')
