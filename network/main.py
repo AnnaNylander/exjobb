@@ -80,8 +80,8 @@ parser.add_argument('-rnn', '--rnn', dest='rnn', action='store_true',
                     help='Wheter we have an rnn or not. (not needed if arch str contains \'rnn\')')
 parser.add_argument('-bl', '--balance', dest='balance', action='store_true',
                     help='Balance dataset by sampling with replacement. Not applicable for RNNs. Forces shuffle to True in training set.')
-#parser.add_argument('-t', '--timeout', default=60*6, type=int, dest='timeout',
-#                    metavar='N', help='Maximum number of minutes to train. (default = 360)')
+parser.add_argument('-t', '--timeout', default=None, type=int, dest='timeout',
+                    metavar='N', help='Maximum number of minutes to train. After this time a validation is done. (default = None)')
 # TODO
 
 args = parser.parse_args()
@@ -221,7 +221,8 @@ def main():
         print("______TRAIN MODEL_______")
         main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                     momentum_scheduler, loss_fn, train_losses, validation_losses,
-                    times, dataloader_train, dataloader_val, best_res, all_time_best_res)
+                    times, dataloader_train, dataloader_val, best_res,
+                    all_time_best_res, args.timeout)
 
     # Final evaluation on test dataset
     if args.evaluate:
@@ -283,19 +284,23 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
 def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                 momentum_scheduler, loss_fn, train_losses,
                 validation_losses, times, dataloader_train, dataloader_val,
-                best_res, all_time_best_res):
+                best_res, all_time_best_res, timeout=None):
 
     print("train network for a total of {diff} epochs."\
             " [{epochs}/{total_epochs}]".format( \
             diff = max(args.epochs-epoch_start,0),
             epochs = epoch_start, total_epochs = args.epochs))
 
+    training_start_time = time.time()
+    time_is_out = False
     step = step_start
     for epoch in range(epoch_start, args.epochs):
         # Train for one epoch
         print('Epoch length:',len(dataloader_train), '(mini-batches)')
 
         for i, batch in enumerate(dataloader_train):
+
+
             batch_start_time = time.time()
 
             # Train model with current batch and save loss and duration
@@ -311,6 +316,14 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             # Print statistics
             if step % args.print_freq == 0:
                 print_statistics(train_losses, times, len(dataloader_train))
+
+            # Check for timeout and possibly break
+            if timeout is not None:
+                minutes_trained = (batch_start_time - training_start_time)/60
+                time_is_out = minutes_trained > timeout
+                if time_is_out:
+                    print('Training reached timeout at %.2f min' %minutes_trained)
+                    break
 
             # Evaluate on validation set and save checkpoint
             if step % args.plot_freq == 0 and step != 0:
@@ -389,6 +402,8 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
         print('Validation complete. Final results: \n'
                 'Loss {losses.val:.4f} ({losses.avg:.4f})'\
                 .format(losses=validation_losses))
+
+        if time_is_out: return # Do not continue with next epoch if time is out
 
 def print_statistics(losses, times, batch_length):
     print('Epoch: [{0}][{1}/{2}]\t'
