@@ -12,31 +12,39 @@ PRINT = True
 
 class CNNOnly(nn.Module):
     ''' CNN all the way, no fully connected layers '''
-    def __init__(self):
+    def __init__(self, n_past_lidars, n_past_steps, n_future_steps):
         super(CNNOnly, self).__init__()
-        # value encoder
-        self.conv_v0 = nn.Conv1d(11,30,3, padding=1)
-        self.conv_v1 = nn.Conv1d(30,30,3, padding=2, dilation=2)
-        self.conv_v2 = nn.Conv1d(30,30,3, padding=4, dilation=4)
-        self.conv_v3 = nn.Conv1d(30,30,3, padding=8, dilation=8)
 
-        self.conv_v4 = nn.Conv1d(30,30,3, padding=16, dilation=16)
+        # Change these values if you want to change the number of steps in the
+        # input or output
+        values_width = 11 # the number of values on each row in values
+        self.vs = (n_past_steps + 1) * values_width # values size
+        self.os = n_future_steps * 2 # output size
+        ns = (n_past_steps + 1) # number of past steps including current
+
+        # value encoder
+        self.conv_v0 = nn.Conv1d(values_width, ns, 3, padding=1)
+        self.conv_v1 = nn.Conv1d(ns, ns,3, padding=2, dilation=2)
+        self.conv_v2 = nn.Conv1d(ns, ns,3, padding=4, dilation=4)
+        self.conv_v3 = nn.Conv1d(ns, ns,3, padding=8, dilation=8)
+
+        self.conv_v4 = nn.Conv1d(ns,ns,3, padding=16, dilation=16)
         self.maxpool_v4 = nn.MaxPool2d((1,2), stride=(1,2))
 
-        self.conv_v5 = nn.Conv1d(30,30,3, padding=1, dilation=1)
+        self.conv_v5 = nn.Conv1d(ns,ns,3, padding=1, dilation=1)
         self.maxpool_v5 = nn.MaxPool2d((1,3), stride=(1,3))
 
-        self.conv_v6 = nn.Conv1d(30,30,3, padding=1, dilation=1)
+        self.conv_v6 = nn.Conv1d(ns,ns,3, padding=1, dilation=1)
         self.maxpool_v6 = nn.MaxPool2d((1,2), stride=(1,1))
 
-        self.conv_v7 = nn.Conv1d(30,30,3, padding=1, dilation=1)
+        self.conv_v7 = nn.Conv1d(ns,ns,3, padding=1, dilation=1)
         self.maxpool_v7 = nn.MaxPool2d((1,2), stride=(1,2))
 
-        self.conv_v8 = nn.Conv1d(30,30,3, padding=1, dilation=1)
+        self.conv_v8 = nn.Conv1d(ns,ns,3, padding=1, dilation=1)
         self.maxpool_v8 = nn.MaxPool2d((1,2), stride=(1,2))
 
         # lidar encoder
-        self.conv_e0 = nn.Conv2d(1, 8, 3, padding=1)
+        self.conv_e0 = nn.Conv2d(n_past_lidars + 1, 8, 3, padding=1)
 
         self.conv_e1 = nn.Conv2d(8, 8, 3, padding=1)
         self.maxpool_e1 = nn.MaxPool2d(2, stride=2)
@@ -46,12 +54,12 @@ class CNNOnly(nn.Module):
         self.conv_e3 = nn.Conv2d(16, 16, 3, padding=1)
         self.maxpool_e3 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_e4 = nn.Conv2d(16, 30, 3, padding=1)
+        self.conv_e4 = nn.Conv2d(16, ns, 3, padding=1)
 
         # context modules
         self.spatial_dropout = nn.Dropout2d(p=0.2)
 
-        self.conv_c0 = nn.Conv2d(30,96,3, padding=1, dilation=1)
+        self.conv_c0 = nn.Conv2d(ns,96,3, padding=1, dilation=1)
         self.conv_c1 = nn.Conv2d(96,96,3, padding=1, dilation=1)
         self.conv_c2 = nn.Conv2d(96,96,3, padding=(2,1), dilation=(2,1))
         self.conv_c3 = nn.Conv2d(96,96,3, padding=(4,2), dilation=(4,2))
@@ -63,164 +71,113 @@ class CNNOnly(nn.Module):
         self.conv_c9 = nn.Conv2d(96,96,3, padding=(28,24), dilation=(28,24))
         self.conv_c10 = nn.Conv2d(96,96,3, padding=(32,28), dilation=(32,28))
         self.conv_c11 = nn.Conv2d(96,96,3, padding=(1,32), dilation=(1,32))
-        self.conv_c12 = nn.Conv2d(96,30,3, padding=1, dilation=1)
+        self.conv_c12 = nn.Conv2d(96,ns,3, padding=1, dilation=1)
 
         # decoder convolutions # 150 x 150 x 16
-        self.conv_d0 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d0 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d0 = nn.MaxPool2d(3, stride=3)
 
-        self.conv_d1 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d1 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d1 = nn.MaxPool2d(3, stride=3)
 
-        self.conv_d2 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d2 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d2 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_d3 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d3 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d3 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_d4 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d4 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d4 = nn.MaxPool2d((2,2), stride=(2,2))
 
-        self.conv_d5 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d5 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d5 = nn.MaxPool2d((1,2), stride=(1,2))
 
 
         # Input l: 600 x 600 x 1, v: 30 x 11
     def forward(self, l, v):
         # input
-        v = v.transpose(1,2) # ensure v is 2x11x30 here         # [2, 11, 30]
-        #print_size(v,PRINT)
-        v = self.spatial_dropout(F.elu(self.conv_v0(v)))        # [2, 30, 30]
-        #print_size(v,PRINT)
-        v = self.spatial_dropout(F.elu(self.conv_v1(v)))        # [2, 30, 30]
-        #print_size(v,PRINT)
-        v = self.spatial_dropout(F.elu(self.conv_v2(v)))        # [2, 30, 30]
-        #print_size(v,PRINT)
-        v = self.spatial_dropout(F.elu(self.conv_v3(v)))        # [2, 30, 30]
-        #print_size(v,PRINT)
+        v = v.transpose(1,2) # ensure v is 2 x values_width x ns here         # [2, 11, 30]
+        v = self.spatial_dropout(F.elu(self.conv_v0(v)))
+        v = self.spatial_dropout(F.elu(self.conv_v1(v)))
+        v = self.spatial_dropout(F.elu(self.conv_v2(v)))
+        v = self.spatial_dropout(F.elu(self.conv_v3(v)))
 
-        v = F.elu(self.conv_v4(v))                              # [2, 30, 30]
+        v = F.elu(self.conv_v4(v))
         v = self.maxpool_v4(v)                                  # [2, 30, 15]
-        #print_size(v,PRINT)
 
         v = F.elu(self.conv_v5(v))                              # [2, 30, 15]
-        #print_size(v,PRINT)
         v = self.maxpool_v5(v)                                  # [2, 30, 5]
-        #print_size(v,PRINT)
 
         v = F.elu(self.conv_v6(v))                              # [2, 30, 5]
-        #print_size(v,PRINT)
         v = self.maxpool_v6(v)                                  # [2, 30, 4]
-        #print_size(v,PRINT)
 
         v = F.elu(self.conv_v7(v))                              # [2, 30, 4]
-        #print_size(v,PRINT)
         v = self.maxpool_v7(v)                                  # [2, 30, 2]
-        #print_size(v,PRINT)
 
         v = F.elu(self.conv_v8(v))                              # [2, 30, 2]
-        #print_size(v,PRINT)
         v = self.maxpool_v8(v)                                  # [2, 30, 1]
-        #print_size(v,PRINT)
         v = v.squeeze()                                         # [2, 30]
 
         # encoder
         l = F.elu(self.conv_e0(l))                              # [2, 8, 600, 600]
-        #
 
         l = F.elu(self.conv_e1(l))                              # [2, 8, 600, 600]
-        #
         l = self.maxpool_e1(l)                                  # [2, 8, 300, 300]
-        #
-
         l = F.elu(self.conv_e2(l))                              # [2, 16, 300, 300]
-        #
-
         l = F.elu(self.conv_e3(l))                              # [2, 16, 300, 300]
-        #
         l = self.maxpool_e3(l)                                  # [2, 16, 150, 150]
-        #
 
         v = expand_biases(v, 150, 150)                          # [2, 16, 150, 150]
-
         l = self.conv_e4(l)                                     # [2, 30, 150, 150]
-
         l = torch.add(l, 1, v)                                  # [2, 30, 150, 150]
-
         l = self.spatial_dropout(F.elu(l))                      # [2, 30, 150, 150]
 
 
         #context module
         l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
-
         l = F.elu(self.conv_c12(l))                             # [2, 30, 150, 150]
 
 
         # decoder convolutions
         l = F.elu(self.conv_d0(l))                              # [2, 30, 150, 150]
-
         l = self.maxpool_d0(l)                                  # [2, 30, 50, 50]
-
-
         l = F.elu(self.conv_d1(l))                              # [2, 30, 50, 50]
-
         l = self.maxpool_d1(l)                                  # [2, 30, 16, 16]
-
-
         l = F.elu(self.conv_d2(l))                              # [2, 30, 16, 16]
-
-        l = self.maxpool_d2(l)
-                                             # [2, 30, 8, 8]
-
+        l = self.maxpool_d2(l)                                  # [2, 30, 8, 8]
         l = F.elu(self.conv_d3(l))                              # [2, 30, 8, 8]
-
-        l = self.maxpool_d3(l)
-                                             # [2, 30, 4, 4]
-
+        l = self.maxpool_d3(l)                                  # [2, 30, 4, 4]
         l = F.elu(self.conv_d4(l))                              # [2, 30, 4, 4]
-
-        l = self.maxpool_d4(l)
-                                             # [2, 30, 2, 2]
-
+        l = self.maxpool_d4(l)                                  # [2, 30, 2, 2]
         l = F.elu(self.conv_d5(l))                              # [2, 30, 4, 2]
-
-        l = self.maxpool_d5(l)
-                                             # [2, 30, 2, 1]
-
-        l = l.squeeze()
-                                             # [2, 30, 2]
-
-        l = l.view(-1,60)                                       # [2, 60]
-                                             # [2, 30
+        l = self.maxpool_d5(l)                                  # [2, 30, 2, 1]
+        l = l.squeeze()                                         # [2, 30, 2]
+        l = l.view(-1,self.os)                                  # [2, self.os]
 
         return l
 
 class CNNLSTM(nn.Module):
     ''' Values are processed in an LSTM and then added as a bias '''
-    def __init__(self):
+    def __init__(self, n_past_lidars, n_past_steps, n_future_steps):
         super(CNNLSTM, self).__init__()
+
+        # Change these values if you want to change the number of steps in the
+        # input or output
+        self.vs = (n_past_steps + 1) * values_width # values size
+        self.os = n_future_steps * 2 # output size
+        ns = (n_past_steps + 1) # number of past steps including current
+
         # value encoder LSTM from values to bias
         input_size = 11 # The number of expected features in the input x
         hidden_size = 64 # The number of features in the hidden state h
@@ -261,32 +218,31 @@ class CNNLSTM(nn.Module):
         self.conv_c9 = nn.Conv2d(96,96,3, padding=(28,24), dilation=(28,24))
         self.conv_c10 = nn.Conv2d(96,96,3, padding=(32,28), dilation=(32,28))
         self.conv_c11 = nn.Conv2d(96,96,3, padding=(1,32), dilation=(1,32))
-        self.conv_c12 = nn.Conv2d(96,30,3, padding=1, dilation=1)
+        self.conv_c12 = nn.Conv2d(96,ns,3, padding=1, dilation=1)
 
         # decoder convolutions # 150 x 150 x 16
-        self.conv_d0 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d0 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d0 = nn.MaxPool2d(3, stride=3)
 
-        self.conv_d1 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d1 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d1 = nn.MaxPool2d(3, stride=3)
 
-        self.conv_d2 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d2 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d2 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_d3 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d3 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d3 = nn.MaxPool2d(2, stride=2)
 
-        self.conv_d4 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d4 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d4 = nn.MaxPool2d((2,2), stride=(2,2))
 
-        self.conv_d5 = nn.Conv2d(30,30,3, padding=1)
+        self.conv_d5 = nn.Conv2d(ns,ns,3, padding=1)
         self.maxpool_d5 = nn.MaxPool2d((1,2), stride=(1,2))
 
-
-    # Input l: 600 x 600 x 1, v: 30 x 11
+    # Input l: 600 x 600 x 1, v: ns x values_width
     def forward(self, l, v):
         # input
-        v = v.transpose(0,1) # ensure v is 30x2x11 here         # [30, 2, 11]
+        v = v.transpose(0,1) # ensure v is ns x batch_size x values_width here         # [30, 2, 11]
 
         # (seq_len, batch, input_size)
         v, hn = self.lstm(v)                                    # [30, 2, 64]
@@ -298,87 +254,56 @@ class CNNLSTM(nn.Module):
         l = F.elu(self.conv_e0(l))                              # [2, 8, 600, 600]
 
         l = F.elu(self.conv_e1(l))                              # [2, 16, 600, 600]
-
         l = self.maxpool_e1(l)                                  # [2, 16, 300, 300]
-
 
         l = F.elu(self.conv_e2(l))                              # [2, 32, 300, 300]
 
-
         l = F.elu(self.conv_e3(l))                              # [2, 64, 300, 300]
-
         l = self.maxpool_e3(l)                                  # [2, 64, 150, 150]
 
 
         # v should have length=channels in l
         v = expand_biases(v, 150, 150)                          # [2, 64, 150, 150]
-
         l = torch.add(l, 1, v)                                  # [2, 64, 150, 150]
-
         l = self.spatial_dropout(F.elu(l))                      # [2, 64, 150, 150]
 
 
         #context module
         l = self.spatial_dropout(F.elu(self.conv_c0(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c1(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c2(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c3(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c4(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c5(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c6(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c7(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c8(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c9(l)))        # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c10(l)))       # [2, 96, 150, 150]
-
         l = self.spatial_dropout(F.elu(self.conv_c11(l)))       # [2, 96, 150, 150]
-
         l = F.elu(self.conv_c12(l))                             # [2, 30, 150, 150]
-
 
         # decoder convolutions
         l = F.elu(self.conv_d0(l))                              # [2, 30, 150, 150]
-
         l = self.maxpool_d0(l)                                  # [2, 30, 50, 50]
 
-
         l = F.elu(self.conv_d1(l))                              # [2, 30, 50, 50]
-
         l = self.maxpool_d1(l)                                  # [2, 30, 16, 16] TODO We are mising pixels here!
 
         l = F.elu(self.conv_d2(l))                              # [2, 30, 16, 16]
-
-        l = self.maxpool_d2(l)
-                                             # [2, 30, 8, 8]
+        l = self.maxpool_d2(l)                                  # [2, 30, 8, 8]
 
         l = F.elu(self.conv_d3(l))                              # [2, 30, 8, 8]
-
-        l = self.maxpool_d3(l)
-                                             # [2, 30, 4, 4]
+        l = self.maxpool_d3(l)                                  # [2, 30, 4, 4]
 
         l = F.elu(self.conv_d4(l))                              # [2, 30, 4, 4]
-
-        l = self.maxpool_d4(l)
-                                             # [2, 30, 2, 2]
+        l = self.maxpool_d4(l)                                  # [2, 30, 2, 2]
 
         l = F.elu(self.conv_d5(l))                              # [2, 30, 4, 2]
+        l = self.maxpool_d5(l)                                  # [2, 30, 2, 1]
 
-        l = self.maxpool_d5(l)
-                                             # [2, 30, 2, 1]
-
-        l = l.squeeze()
-                                             # [2, 30, 2]
-        l = l.view(-1,60)
+        l = l.squeeze()                                         # [2, 30, 2]
+        l = l.view(-1, self.os)
 
         return l
 
