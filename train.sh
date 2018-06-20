@@ -7,6 +7,7 @@ PRINT_FREQ=10
 BATCH_SIZE=16
 FOLDER_NAME=test_deluxe/
 DATASET=flexible/
+CLUSTER_PATH='/home/annaochjacob/Repos/exjobb/preprocessing/path_clustering/'
 
 # Best network when trained with SGD and scheduler, but now trained with Adam to see the difference (using same lr)
 #python3 main.py -e $EPOCHS -b $BATCH_SIZE -pl $PLOT_FREQ -a cnn_bias.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}CNNBiasAll_2pf/ -pf 2 -fs 2 -bl -o "Adam( model.parameters(), lr=5*1e-6, weight_decay=1e-5, amsgrad=True)" #--resume ${FOLDER_NAME}CNNBiasAll_2pf/checkpoint.pt
@@ -66,11 +67,17 @@ DATASET=flexible/
 
 #python3 main.py -e 4 -b 12 -pl $PLOT_FREQ -a more_layers_3.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}more_layers_3/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420
 
-python3 main.py -e 4 -b 6 -pl $PLOT_FREQ -a more_layers_4.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}more_layers_4/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420
+#python3 main.py -e 4 -b 6 -pl $PLOT_FREQ -a more_layers_4.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}more_layers_4/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420
 
 
 # Train using ona more maxpooling before the context module. Note that the batch size is set higher for this one to be more fair, since the loading time for each batch doesn't go below ~0.2s even for small batch sizes.
-python3 main.py -e 16 -b 24 -pl $PLOT_FREQ -a more_max_pool_1.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}more_maxpool_1/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420
+#python3 main.py -e 16 -b 24 -pl $PLOT_FREQ -a more_max_pool_1.CNNBiasAll -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}more_maxpool_1/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420
 
-
+#-------------------------------------------------------------------------------
+# Train the cluster + pc_delta network using 7 principal components and 10 clusters
+python3 main_clusters.py -e 4 -b 12 -pl $PLOT_FREQ -a cluster_1.ClusterNet -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}cluster_1_10_cl_7_pc/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420 -ncl 10 -npc 7 -cpath ${CLUSTER_PATH}10_clusters/
+# Train the cluster + pc_delta network using 7 principal components and 20 clusters
+python3 main_clusters.py -e 4 -b 12 -pl $PLOT_FREQ -a cluster_1.ClusterNet -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}cluster_1_20_cl_7_pc/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420 -ncl 20 -npc 7 -cpath ${CLUSTER_PATH}20_clusters/
+# Train the cluster + pc_delta network using 7 principal components and 50 clusters
+python3 main_clusters.py -e 4 -b 12 -pl $PLOT_FREQ -a cluster_1.ClusterNet -p $PRINT_FREQ -d $DATASET -s ${FOLDER_NAME}cluster_1_50_cl_7_pc/ -ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' -bl -o "Adam( model.parameters(), lr=1e-5, weight_decay=1e-5, amsgrad=True)" -t 420 -ncl 50 -npc 7 -cpath ${CLUSTER_PATH}50_clusters/
 echo "Train script completed."

@@ -1,5 +1,9 @@
-n_clusters = 20;
+%% Run this script to save cluster and PCA matrices.
 
+% Set number of clusters
+n_clusters = 10;
+
+%% Read all trajectories
 top_dir = '/media/annaochjacob/crucial/dataset/flexible/train/';
 fruits = dir(top_dir);
 fruits(ismember( {fruits.name}, {'.', '..'})) = [];  %remove . and ..
@@ -15,14 +19,22 @@ for f = 1:length(fruits)
     trajectories = [trajectories; t];
 end
 
+%% Compute variable mean for PCA reconstruction
+means = mean(trajectories)
+csvwrite('variable_mean.csv', means);
+
+%% Perform k-means clustering
 disp('Running k-means clustering algorithm...')
 [idx,C] = kmeans(trajectories, n_clusters, 'MaxIter', 100);
-save C C % Save cluster centroids
+csvwrite('centroids.csv', C) % Save cluster centroids
+csvwrite('cluster_idx.csv', idx);
 
+%% Perform PCA
 disp('Finding principal components...')
 coeff = pca(trajectories);
-save coeff coeff
+csvwrite('coeff.csv',coeff);
 
+%% Plot clusters
 disp('Plotting clusters...')
 for c = 1:n_clusters
     c

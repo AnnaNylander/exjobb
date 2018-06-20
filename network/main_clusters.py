@@ -15,7 +15,6 @@ import time
 import os
 import re
 import shutil
-import matlab.engine
 from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SequentialSampler, WeightedRandomSampler
@@ -24,7 +23,6 @@ from architectures import *
 from data_to_dict import get_data
 from dataset import OurDataset, RNNDataset
 from scheduler import Scheduler
-from settings import Settings
 #from architectures.network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
 from result_meter import ResultMeter
 
@@ -91,6 +89,12 @@ parser.add_argument('-bl', '--balance', dest='balance', action='store_true',
                     help='Balance dataset by sampling with replacement. Not applicable for RNNs. Forces shuffle to True in training set.')
 parser.add_argument('-t', '--timeout', default=None, type=int, dest='timeout',
                     metavar='N', help='Maximum number of minutes to train. After this time a validation is done. (default = None)')
+parser.add_argument('-npc', '--n-components', default=10, type=int, dest='n_pc',
+                    metavar='N', help='Number of leading principal components to be predicted. (default = 10)')
+parser.add_argument('-ncl', '--n-clusters', default=10, type=int, dest='n_clusters',
+                    metavar='N', help='Number of clusters to choose from. (default = 10)')
+parser.add_argument('-cpath','--cluster-path', default='', type=str, metavar='PATH',
+                    help='Full path to folder containing cluster data and principal component data.')
 # TODO
 
 args = parser.parse_args()
@@ -131,10 +135,10 @@ if args.scheduler and (learning_rate == 0 or momentum == 0):
         Learning rate is " + str(learning_rate) + " and momentum is " + str(momentum) )
 
 # start matlab engine
-eng = matlab.engine.start_matlab()
-matlab_wd = '/home/annaochjacob/Repos/exjobb/preprocessing/path_clustering/'
-eng.addpath(matlab_wd)
-eng.cd(matlab_wd)
+#eng = matlab.engine.start_matlab()
+#matlab_wd = '/home/annaochjacob/Repos/exjobb/preprocessing/path_clustering/'
+#eng.addpath(matlab_wd)
+#eng.cd(matlab_wd)
 
 # Load centroid
 
@@ -167,8 +171,8 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance)
-        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False)
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance,sampler_max=100)
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False,sampler_max=100)
     dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False)
 
     # create new model and lossfunctions and stuff
@@ -177,14 +181,15 @@ def main():
         n_ipf = str(len(args.input_past_frames))
         n_off = str(len(args.output_future_frames))
         n_mpf = str(len(args.manual_past_frames))
-        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(args.n_pc) + ', ' + str(args.n_clusters)
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
 
         # define loss function and optimizer
         print("-----Creating lossfunction and optimizer-----")
-        loss_fn = torch.nn.MSELoss().cuda()
+        trajectory_loss_fn = torch.nn.MSELoss().cuda()
+        class_loss_fn = torch.nn.CrossEntropyLoss().cuda()
         optimizer = eval('torch.optim.' + args.optim)
         if args.scheduler:
             lr_scheduler.setValues(len(dataloader_train)*args.epochs, learning_rate/10, learning_rate)
@@ -207,7 +212,7 @@ def main():
         n_ipf = str(len(args.input_past_frames))
         n_off = str(len(args.output_future_frames))
         n_mpf = str(len(args.manual_past_frames))
-        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(n_pc) + ', ' + str(n_clusters)
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
@@ -237,14 +242,17 @@ def main():
     if not args.evaluate:
         print("______TRAIN MODEL_______")
         main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
-                    momentum_scheduler, loss_fn, train_losses, validation_losses,
-                    times, dataloader_train, dataloader_val, best_res,
-                    all_time_best_res, args.timeout)
+                    momentum_scheduler, class_loss_fn, trajectory_loss_fn,
+                    train_losses, validation_losses, times, dataloader_train,
+                    dataloader_val, best_res, all_time_best_res, args.n_pc,
+                    args.n_clusters, args.cluster_path, args.timeout)
 
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        test_loss = validate(model, dataloader_test, loss_fn, True)
+        test_loss = validate(model, dataloader_test, class_loss_fn,
+                            trajectory_loss_fn, coeffs, means, centroids,
+                            optimizer, n_pc, n_clusters, True)
         print("Test loss: %f" %test_loss)
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
@@ -267,7 +275,8 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
 
     # NOT RNN
     data = get_data(path, args.manual_past_frames)
-    dataset = OurDataset(path, data, args.no_intention, args.only_lidar, args.manual_past_frames, args.input_past_frames, args.output_future_frames)
+    dataset = OurDataset(path, data, args.no_intention, args.only_lidar,
+                args.manual_past_frames, args.input_past_frames, args.output_future_frames)
     categories = numpy.array(dataset.categories)
     weights = [1]*len(categories)
     replacement = False
@@ -299,9 +308,31 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
                                sampler=sampler)
 
 def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
-                momentum_scheduler, loss_fn, train_losses,
+                momentum_scheduler,  class_loss_fn, trajectory_loss_fn, train_losses,
                 validation_losses, times, dataloader_train, dataloader_val,
-                best_res, all_time_best_res, timeout=None):
+                best_res, all_time_best_res, n_pc, n_clusters, cluster_path, timeout=None):
+
+    # Load principal component coefficient (or factor loadings) matrix
+    coeffs = numpy.genfromtxt(cluster_path + 'coeff.csv',delimiter=',')
+
+    # Use only the n_pc first components
+    coeffs = coeffs[:,0:n_pc]
+    coeffs = Variable(torch.cuda.FloatTensor(coeffs), requires_grad=False)
+
+    # Load mean of variables for PCA reconstruction
+    means = numpy.genfromtxt(cluster_path + 'variable_mean.csv',delimiter=',')
+    means = Variable(torch.cuda.FloatTensor(means), requires_grad=False)
+
+    # Load cluster centroids
+    centroids = numpy.genfromtxt(cluster_path + 'centroids.csv',delimiter=',')
+    centroids = Variable(torch.cuda.FloatTensor(centroids), requires_grad=False)
+    #n_clusters = centroids.shape[0]
+
+    # Load cluster indices for trajectories (used for debugging)
+    cluster_idx = numpy.genfromtxt(cluster_path + 'cluster_idx.csv',delimiter=',')
+
+    # Make zero-indexed for convenience
+    cluster_idx = cluster_idx - 1
 
     print("train network for a total of {diff} epochs."\
             " [{epochs}/{total_epochs}]".format( \
@@ -321,7 +352,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             batch_start_time = time.time()
 
             # Train model with current batch and save loss and duration
-            train_loss = train(model, batch, loss_fn, optimizer)
+            train_loss = train(model, batch, class_loss_fn, trajectory_loss_fn, coeffs, means, centroids, optimizer, n_pc, n_clusters)
             train_losses.update(epoch + 1, i + 1, step, train_loss)
             times.update(epoch + 1, i + 1, step, time.time() - batch_start_time)
 
@@ -344,7 +375,9 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
 
             # Evaluate on validation set and save checkpoint
             if step % args.plot_freq == 0 and step != 0:
-                validation_loss = validate(model, dataloader_val, loss_fn)
+                validation_loss = validate(model, dataloader_val, class_loss_fn,
+                                    trajectory_loss_fn, coeffs, means, centroids,
+                                    optimizer, n_pc, n_clusters)
                 validation_losses.update(epoch + 1, i + 1, step, validation_loss)
                 # Save losses to csv for plotting
                 save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
@@ -383,7 +416,9 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
         #print epoch results
         print_statistics(train_losses, times, len(dataloader_train))
 
-        validation_loss = validate(model, dataloader_val, loss_fn)
+        validation_loss = validate(model, dataloader_val, class_loss_fn,
+                            trajectory_loss_fn, coeffs, means, centroids,
+                            optimizer, n_pc, n_clusters)
         validation_losses.update(epoch + 1, i + 1, step, validation_loss)
         # Save losses to csv for plotting
         save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
@@ -428,45 +463,86 @@ def print_statistics(losses, times, batch_length):
           'Batch loss {losses.val:.4f} ({losses.avg:.4f})'.format( losses.epoch,
            losses.batch, batch_length, batch_time=times, losses=losses))
 
-def train(model, batch, loss_fn, optimizer):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def train(model, batch, class_loss_fn, trajectory_loss_fn, coeffs, means,
+            centroids, optimizer, n_pc, n_clusters):
     model.train() # switch to train mode
 
+    # These are the lidar and value matrices used as input
     lidars = Variable((batch['lidar']).type(torch.cuda.FloatTensor))
     values = Variable((batch['value']).type(torch.cuda.FloatTensor))
+
+    # This is the ground truth trajectory
     targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
 
-    # Classify targets
-    # The k-means clustering was performed with squared euclidean distance as
-    # distance metric. This means that we can find the closest centroid by
-    # calculating the MSE between the input trajectory and every centroid.
-    nearest_centroid = torch.argmax(loss_fn(targets[0],centroids), dim=1)
-    batch_size = torch.size(batch,0)
-    n_dims =
-    cluster_target = torch.zeros(batch_size, )
-    print(eng.sin(0.2))
+    # Get batch size for creating tensor views later
+    batch_size = targets.shape[0]
 
-    # Cluster is a distribution over trajectory classes
-    cluster, pc_deltas = model(lidars, values)
+    # Find the cluster index for each of the ground truth trajectories in batch
+    # NOTE target_class has been verified to work as expected
+    target_class = get_cluster_idx(targets, centroids)
+    target_class = Variable(target_class.cuda(), requires_grad=False)
 
-    loss_classification = loss_c_fn(cluster, cluster_targets)
-    # pc_deltas 7 variabler * 10 klasser (7x10)
-    # pc 7 variabler * 10 klasser (7x10)
-    output_pc = pc_deltas + pcs #elementwise addition
+    # Compute principal component adjustments and predict the trajectory class
+    pc_deltas, class_logits = model(lidars,values)
 
-    path_values = key_matrix * output_pc #from pc to 60 -values
-    #path_values är nu 60 variabler * 10 klasser (60x10)
+    # Make view of pc_delta
+    # from shape [batch_size, n_clusters * n_pc]
+    # to shape [batch_size, n_clusters, n_pc]
+    # NOTE view operation has been verified to work as expected
+    pc_deltas = pc_deltas.view(batch_size, n_clusters, n_pc)
 
-    loss_values = loss_fn(path_values, targets) # loss 60 values
+    # Get index of predicted class with highest value
+    #(not yet on the form of a probability distribution)
+    # NOTE max operation has been verified to work as expected
+    _, predicted_class = torch.max(class_logits,1)
 
-    loss_total = loss_classification + loss_values
-    loss_total.backward()
+    # Compute loss on the class prediction. Class_loss then is a scalar tensor
+    # containing the average loss over observations in the minibatch.
+    class_loss = class_loss_fn(class_logits, target_class)
 
-    optimizer.step() # update weights
-    optimizer.zero_grad() # reset gradients
+    # Add deltas to predicted cluster centroid principal components
+    # NOTE everything from here up to and including pc_adjusted is verified to work as expected
+    predicted_centroid = centroids[predicted_class]
+    pc_centroid = torch.mm(predicted_centroid, coeffs) # [batch_size, 60] * [60, n_pc] = [batch_size, n_pc]
+    pc_deltas_predicted = pc_deltas[numpy.arange(0,batch_size),predicted_class]
+    pc_adjusted = torch.add(pc_centroid, pc_deltas_predicted)
 
-    return loss.data[0] # return loss for this batch
+    # Go from principal components to original projection
+    # NOTE predicted_trajectory is verified to work as expected
+    predicted_trajectory = torch.mm(pc_adjusted,coeffs.transpose(0,1)) + means
 
-def validate(model, dataloader, loss_fn, save_output=False):
+    # Compute loss on the adjusted trajectory
+    trajectory_loss = trajectory_loss_fn(predicted_trajectory, targets)
+
+    # Compute the total loss as the sum of class loss and trajectory loss
+    total_loss = class_loss + trajectory_loss
+
+    optimizer.zero_grad()
+    total_loss.backward()
+    optimizer.step()
+    return total_loss.data
+
+def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means,
+            centroids, optimizer, n_pc, n_clusters, save_output=False):
     model.eval() # switch to eval mode
     losses = ResultMeter()
 
@@ -477,9 +553,48 @@ def validate(model, dataloader, loss_fn, save_output=False):
         targets = Variable((batch['output']).type(torch.cuda.FloatTensor))#,volatile=True)
         indices = batch['index']
 
-        # Run model and calculate loss
-        output = model(lidars, values)
-        loss = loss_fn(output, targets)
+        # Get batch size for creating tensor views later
+        batch_size = targets.shape[0]
+
+        # Find the cluster index for each of the ground truth trajectories in batch
+        # NOTE target_class has been verified to work as expected
+        target_class = get_cluster_idx(targets, centroids)
+        target_class = Variable(target_class.cuda(), requires_grad=False)
+
+        # Compute principal component adjustments and predict the trajectory class
+        pc_deltas, class_logits = model(lidars,values)
+
+        # Make view of pc_delta
+        # from shape [batch_size, n_clusters * n_pc]
+        # to shape [batch_size, n_clusters, n_pc]
+        # NOTE view operation has been verified to work as expected
+        pc_deltas = pc_deltas.view(batch_size, n_clusters, n_pc)
+
+        # Get index of predicted class with highest value
+        #(not yet on the form of a probability distribution)
+        # NOTE max operation has been verified to work as expected
+        _, predicted_class = torch.max(class_logits,1)
+
+        # Compute loss on the class prediction. Class_loss then is a scalar tensor
+        # containing the average loss over observations in the minibatch.
+        class_loss = class_loss_fn(class_logits, target_class)
+
+        # Add deltas to predicted cluster centroid principal components
+        # NOTE everything from here up to and including pc_adjusted is verified to work as expected
+        predicted_centroid = centroids[predicted_class]
+        pc_centroid = torch.mm(predicted_centroid, coeffs) # [batch_size, 60] * [60, n_pc] = [batch_size, n_pc]
+        pc_deltas_predicted = pc_deltas[numpy.arange(0,batch_size),predicted_class]
+        pc_adjusted = torch.add(pc_centroid, pc_deltas_predicted)
+
+        # Go from principal components to original projection
+        # NOTE predicted_trajectory is verified to work as expected
+        predicted_trajectory = torch.mm(pc_adjusted,coeffs.transpose(0,1)) + means
+
+        # Compute loss on the adjusted trajectory
+        trajectory_loss = trajectory_loss_fn(predicted_trajectory, targets)
+
+        # Compute the total loss as the sum of class loss and trajectory loss
+        loss = class_loss + trajectory_loss
 
         # Save generated predictions to file
         if save_output:
@@ -551,6 +666,18 @@ def write_info_file():
         file = open(PATH_SAVE + "info.txt", "w")
         file.write(info)
         file.close()
+
+def get_cluster_idx(points, centroids):
+    # Use the squared euclidean distance, since that was used when
+    # constructing cluster centroids.
+    indices = []
+    for point in points:
+        # Calculate distance from point to each centroid
+        distances = torch.FloatTensor([(point - c).pow(2).sum() for c in centroids])
+        cluster_idx = torch.argmin(distances)
+        indices.append(cluster_idx)
+
+    return torch.LongTensor(indices)
 
 if __name__ == '__main__':
     main()
