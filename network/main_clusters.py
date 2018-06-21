@@ -153,8 +153,10 @@ def main():
     best_res = 1000000 #big number
     epoch_start = 0
     step_start = 0
-    train_losses = ResultMeter()
-    validation_losses = ResultMeter()
+    train_class_losses = ResultMeter()
+    validation_class_losses = ResultMeter()
+    train_regression_losses = ResultMeter()
+    validation_regression_losses = ResultMeter()
     times = ResultMeter()
     lr_scheduler = Scheduler('lr')
     momentum_scheduler = Scheduler('momentum')
@@ -171,9 +173,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance)
-        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False)
-    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False)
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance,sampler_max=100)
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False,sampler_max=100)
+    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False,sampler_max=100)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -231,8 +233,10 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer'])
         lr_scheduler.deserialize(checkpoint['lr_scheduler'])
         momentum_scheduler.deserialize(checkpoint['momentum_scheduler'])
-        train_losses.deserialize(checkpoint['train_losses'])
-        validation_losses.deserialize(checkpoint['validation_losses'])
+        train_class_losses.deserialize(checkpoint['train_class_losses'])
+        validation_class_losses.deserialize(checkpoint['validation_class_losses'])
+        train_regression_losses.deserialize(checkpoint['train_regression_losses'])
+        validation_regression_losses.deserialize(checkpoint['validation_regression_losses'])
         times.deserialize(checkpoint['times'])
 
         del checkpoint
@@ -243,17 +247,20 @@ def main():
         print("______TRAIN MODEL_______")
         main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                     momentum_scheduler, class_loss_fn, trajectory_loss_fn,
-                    train_losses, validation_losses, times, dataloader_train,
-                    dataloader_val, best_res, all_time_best_res, args.n_pc,
-                    args.n_clusters, args.cluster_path, args.timeout)
+                    train_class_losses, validation_class_losses,
+                    train_regression_losses, validation_regression_losses,
+                    times, dataloader_train, dataloader_val, best_res,
+                    all_time_best_res, args.n_pc, args.n_clusters,
+                    args.cluster_path, args.timeout)
 
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        test_loss = validate(model, dataloader_test, class_loss_fn,
-                            trajectory_loss_fn, coeffs, means, centroids,
-                            optimizer, n_pc, n_clusters, True)
-        print("Test loss: %f" %test_loss)
+        test_class_loss, test_regression_loss = validate(model, dataloader_test,
+                            class_loss_fn, trajectory_loss_fn, coeffs, means,
+                            centroids, optimizer, n_pc, n_clusters, True)
+        print("Test regression loss: %f" %test_regression_loss)
+        print("Test classification loss: %f" %test_class_loss)
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
@@ -308,8 +315,10 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
                                sampler=sampler)
 
 def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
-                momentum_scheduler,  class_loss_fn, trajectory_loss_fn, train_losses,
-                validation_losses, times, dataloader_train, dataloader_val,
+                momentum_scheduler,  class_loss_fn, trajectory_loss_fn,
+                train_class_losses, validation_class_losses,
+                train_regression_losses, validation_regression_losses,
+                times, dataloader_train, dataloader_val,
                 best_res, all_time_best_res, n_pc, n_clusters, cluster_path, timeout=None):
 
     # Load principal component coefficient (or factor loadings) matrix
@@ -352,8 +361,11 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             batch_start_time = time.time()
 
             # Train model with current batch and save loss and duration
-            train_loss = train(model, batch, class_loss_fn, trajectory_loss_fn, coeffs, means, centroids, optimizer, n_pc, n_clusters)
-            train_losses.update(epoch + 1, i + 1, step, train_loss)
+            train_class_loss, train_regression_loss = train(model, batch,
+                class_loss_fn, trajectory_loss_fn, coeffs,means, centroids,
+                optimizer, n_pc, n_clusters)
+            train_class_losses.update(epoch + 1, i + 1, step, train_class_loss)
+            train_regression_losses.update(epoch + 1, i + 1, step, train_regression_loss)
             times.update(epoch + 1, i + 1, step, time.time() - batch_start_time)
 
             #Update learning rate and momentum
@@ -363,7 +375,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
 
             # Print statistics
             if step % args.print_freq == 0:
-                print_statistics(train_losses, times, len(dataloader_train))
+                print_statistics(train_regression_losses, times, len(dataloader_train))
 
             # Check for timeout and possibly break
             if timeout is not None:
@@ -375,13 +387,17 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
 
             # Evaluate on validation set and save checkpoint
             if step % args.plot_freq == 0 and step != 0:
-                validation_loss = validate(model, dataloader_val, class_loss_fn,
-                                    trajectory_loss_fn, coeffs, means, centroids,
-                                    optimizer, n_pc, n_clusters)
-                validation_losses.update(epoch + 1, i + 1, step, validation_loss)
+                validation_class_loss, validation_regression_loss = validate(model,
+                    dataloader_val, class_loss_fn, trajectory_loss_fn, coeffs,
+                    means, centroids, optimizer, n_pc, n_clusters)
+
+                validation_class_losses.update(epoch + 1, i + 1, step, validation_class_loss)
+                validation_regression_losses.update(epoch + 1, i + 1, step, validation_regression_loss)
                 # Save losses to csv for plotting
-                save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
-                save_statistic(validation_losses, PATH_SAVE + 'validation_losses.csv')
+                save_statistic(train_class_losses, PATH_SAVE + 'train_class_losses.csv')
+                save_statistic(validation_class_losses, PATH_SAVE + 'validation_class_losses.csv')
+                save_statistic(train_regression_losses, PATH_SAVE + 'train_regression_losses.csv')
+                save_statistic(validation_regression_losses, PATH_SAVE + 'validation_regression_losses.csv')
 
                 # Store best loss value
                 is_best = validation_loss < best_res
@@ -405,8 +421,10 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                     'optimizer' : optimizer.state_dict(),
                     'lr_scheduler' : lr_scheduler.serialize(),
                     'momentum_scheduler' : momentum_scheduler.serialize(),
-                    'train_losses' : train_losses.serialize(),
-                    'validation_losses' : validation_losses.serialize(),
+                    'train_class_losses' : train_class_losses.serialize(),
+                    'validation_class_losses' : validation_class_losses.serialize(),
+                    'train_regression_losses' : train_regression_losses.serialize(),
+                    'validation_regression_losses' : validation_regression_losses.serialize(),
                     'times' : times.serialize()
                 }, is_best, is_all_time_best)
 
@@ -414,21 +432,25 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             #end of dataloader loop
 
         #print epoch results
-        print_statistics(train_losses, times, len(dataloader_train))
+        print_statistics(train_regression_losses, times, len(dataloader_train))
 
-        validation_loss = validate(model, dataloader_val, class_loss_fn,
-                            trajectory_loss_fn, coeffs, means, centroids,
-                            optimizer, n_pc, n_clusters)
-        validation_losses.update(epoch + 1, i + 1, step, validation_loss)
+        validation_class_loss, validation_regression_loss = validate(model,
+            dataloader_val, class_loss_fn, trajectory_loss_fn, coeffs, means,
+            centroids, optimizer, n_pc, n_clusters)
+
+        validation_class_losses.update(epoch + 1, i + 1, step, validation_class_loss)
+        validation_regression_losses.update(epoch + 1, i + 1, step, validation_regression_loss)
         # Save losses to csv for plotting
-        save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
-        save_statistic(validation_losses, PATH_SAVE + 'validation_losses.csv')
+        save_statistic(train_class_losses, PATH_SAVE + 'train_class_losses.csv')
+        save_statistic(validation_class_losses, PATH_SAVE + 'validation_class_losses.csv')
+        save_statistic(train_regression_losses, PATH_SAVE + 'train_regression_losses.csv')
+        save_statistic(validation_regression_losses, PATH_SAVE + 'validation_regression_losses.csv')
 
         # Store best loss value
-        is_best = validation_loss < best_res
-        best_res = min(validation_loss, best_res)
-        is_all_time_best = validation_loss < all_time_best_res
-        all_time_best_res = min(validation_loss, all_time_best_res)
+        is_best = validation_regression_loss < best_res
+        best_res = min(validation_regression_loss, best_res)
+        is_all_time_best = validation_regression_loss < all_time_best_res
+        all_time_best_res = min(validation_regression_loss, all_time_best_res)
 
         # Save checkpoint
         save_checkpoint({
@@ -446,14 +468,18 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             'optimizer' : optimizer.state_dict(),
             'lr_scheduler' : lr_scheduler.serialize(),
             'momentum_scheduler' : momentum_scheduler.serialize(),
-            'train_losses' : train_losses.serialize(),
-            'validation_losses' : validation_losses.serialize(),
+            'train_class_losses' : train_class_losses.serialize(),
+            'validation_class_losses' : validation_class_losses.serialize(),
+            'train_regression_losses' : train_regression_losses.serialize(),
+            'validation_regression_losses' : validation_regression_losses.serialize(),
             'times' : times.serialize()
         }, is_best, is_all_time_best)
 
-        print('Validation complete. Final results: \n'
-                'Loss {losses.val:.4f} ({losses.avg:.4f})'\
-                .format(losses=validation_losses))
+        print('Validation complete. Final results: \n' \
+                'Regression loss {reg_losses.val:.4f} ({reg_losses.avg:.4f})\n'\
+                'Classification loss {class_losses.val:.4f} ({class_losses.avg:.4f})\n'\
+                .format(reg_losses=validation_regression_losses,
+                        class_losses=validation_class_losses))
 
         if time_is_out: return # Do not continue with next epoch if time is out
 
@@ -462,25 +488,6 @@ def print_statistics(losses, times, batch_length):
           'Batch time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
           'Batch loss {losses.val:.4f} ({losses.avg:.4f})'.format( losses.epoch,
            losses.batch, batch_length, batch_time=times, losses=losses))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def train(model, batch, class_loss_fn, trajectory_loss_fn, coeffs, means,
             centroids, optimizer, n_pc, n_clusters):
@@ -539,12 +546,13 @@ def train(model, batch, class_loss_fn, trajectory_loss_fn, coeffs, means,
     optimizer.zero_grad()
     total_loss.backward()
     optimizer.step()
-    return total_loss.data
+    return class_loss.data, trajectory_loss.data
 
 def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means,
             centroids, optimizer, n_pc, n_clusters, save_output=False):
     model.eval() # switch to eval mode
-    losses = ResultMeter()
+    regression_losses = ResultMeter() # Record trajectory MSE loss
+    class_losses = ResultMeter() # Record classification Crossentropy losses
 
     for i, batch in enumerate(dataloader):
         # Read input and output into variables
@@ -594,7 +602,7 @@ def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means
         trajectory_loss = trajectory_loss_fn(predicted_trajectory, targets)
 
         # Compute the total loss as the sum of class loss and trajectory loss
-        loss = class_loss + trajectory_loss
+        total_loss = class_loss + trajectory_loss
 
         # Save generated predictions to file
         if save_output:
@@ -604,15 +612,16 @@ def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means
             generate_output(indices, outputs, batch['foldername'], path)
 
         # Document results
-        losses.update(0, 0, i, loss.data[0])
+        regression_losses.update(0, 0, i, trajectory_loss.data[0])
+        class_losses.update(0, 0, i, class_loss.data[0])
 
         # Print statistics
         if i % args.print_freq == 0:
             print('Validation: [{batch}/{total}]\t'
-                  'Loss {losses.val:.4f} ({losses.avg:.4f})'.format( batch = i,
-                    total = len(dataloader), losses=losses))
+                  'Regression Loss {regression_losses.val:.4f}({regression_losses.avg:.4f})'.format( batch = i,
+                    total = len(dataloader), regression_losses=regression_losses))
 
-    return losses.avg
+    return class_losses.avg, regression_losses.avg
 
 def generate_output(indices, outputs, foldername, path):
     if not os.path.exists(path):
