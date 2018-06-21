@@ -400,10 +400,10 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                 save_statistic(validation_regression_losses, PATH_SAVE + 'validation_regression_losses.csv')
 
                 # Store best loss value
-                is_best = validation_loss < best_res
-                best_res = min(validation_loss, best_res)
-                is_all_time_best = validation_loss < all_time_best_res
-                all_time_best_res = min(validation_loss, all_time_best_res)
+                is_best = validation_regression_loss < best_res
+                best_res = min(validation_regression_loss, best_res)
+                is_all_time_best = validation_regression_loss < all_time_best_res
+                all_time_best_res = min(validation_regression_loss, all_time_best_res)
 
                 # Save checkpoint
                 save_checkpoint({
