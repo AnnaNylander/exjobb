@@ -173,9 +173,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance,sampler_max=100)
-        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False,sampler_max=100)
-    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False,sampler_max=100)
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance)
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False)
+    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
