@@ -1,12 +1,4 @@
 # -*- coding: utf-8 -*-
-''' This is the main module for training networks which make use of clusters of
-trajectories. The future path is predicted to be in one of several different
-clusters. The centroid of the predicted cluster with highest probability is then
-modified using delta values, which are also predicted. The delta values are
-differences in principal component values and are added to the centroids'
-principal components. The resulting trajectory is compared with the ground truth
-using MSE.'''
-
 import torch
 import pandas
 import numpy
@@ -91,11 +83,8 @@ parser.add_argument('-t', '--timeout', default=None, type=int, dest='timeout',
                     metavar='N', help='Maximum number of minutes to train. After this time a validation is done. (default = None)')
 parser.add_argument('-npc', '--n-components', default=10, type=int, dest='n_pc',
                     metavar='N', help='Number of leading principal components to be predicted. (default = 10)')
-parser.add_argument('-ncl', '--n-clusters', default=10, type=int, dest='n_clusters',
-                    metavar='N', help='Number of clusters to choose from. (default = 10)')
-parser.add_argument('-cpath','--cluster-path', default='', type=str, metavar='PATH',
-                    help='Full path to folder containing cluster data and principal component data.')
-# TODO
+parser.add_argument('-cpath', default='', type=str, dest='pc_path', metavar='PATH',
+                    help='Full path to folder containing principal component data.')
 
 args = parser.parse_args()
 
@@ -134,14 +123,6 @@ if args.scheduler and (learning_rate == 0 or momentum == 0):
     print("\n SCHEDULER WARNING: Could not find learning rate or momentum with regex. \
         Learning rate is " + str(learning_rate) + " and momentum is " + str(momentum) )
 
-# start matlab engine
-#eng = matlab.engine.start_matlab()
-#matlab_wd = '/home/annaochjacob/Repos/exjobb/preprocessing/path_clustering/'
-#eng.addpath(matlab_wd)
-#eng.cd(matlab_wd)
-
-# Load centroid
-
 def main():
 
     #write info file
@@ -153,10 +134,8 @@ def main():
     best_res = 1000000 #big number
     epoch_start = 0
     step_start = 0
-    train_class_losses = ResultMeter()
-    validation_class_losses = ResultMeter()
-    train_regression_losses = ResultMeter()
-    validation_regression_losses = ResultMeter()
+    train_losses = ResultMeter()
+    validation_losses = ResultMeter()
     times = ResultMeter()
     lr_scheduler = Scheduler('lr')
     momentum_scheduler = Scheduler('momentum')
@@ -183,15 +162,14 @@ def main():
         n_ipf = str(len(args.input_past_frames))
         n_off = str(len(args.output_future_frames))
         n_mpf = str(len(args.manual_past_frames))
-        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(args.n_pc) + ', ' + str(args.n_clusters)
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(args.n_pc)
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
 
         # define loss function and optimizer
         print("-----Creating lossfunction and optimizer-----")
-        trajectory_loss_fn = torch.nn.MSELoss().cuda()
-        class_loss_fn = torch.nn.CrossEntropyLoss().cuda()
+        loss_fn = torch.nn.MSELoss().cuda()
         optimizer = eval('torch.optim.' + args.optim)
         if args.scheduler:
             lr_scheduler.setValues(len(dataloader_train)*args.epochs, learning_rate/10, learning_rate)
@@ -214,7 +192,7 @@ def main():
         n_ipf = str(len(args.input_past_frames))
         n_off = str(len(args.output_future_frames))
         n_mpf = str(len(args.manual_past_frames))
-        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(n_pc) + ', ' + str(n_clusters)
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
@@ -233,10 +211,8 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer'])
         lr_scheduler.deserialize(checkpoint['lr_scheduler'])
         momentum_scheduler.deserialize(checkpoint['momentum_scheduler'])
-        train_class_losses.deserialize(checkpoint['train_class_losses'])
-        validation_class_losses.deserialize(checkpoint['validation_class_losses'])
-        train_regression_losses.deserialize(checkpoint['train_regression_losses'])
-        validation_regression_losses.deserialize(checkpoint['validation_regression_losses'])
+        train_losses.deserialize(checkpoint['train_losses'])
+        validation_losses.deserialize(checkpoint['validation_losses'])
         times.deserialize(checkpoint['times'])
 
         del checkpoint
@@ -246,21 +222,15 @@ def main():
     if not args.evaluate:
         print("______TRAIN MODEL_______")
         main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
-                    momentum_scheduler, class_loss_fn, trajectory_loss_fn,
-                    train_class_losses, validation_class_losses,
-                    train_regression_losses, validation_regression_losses,
+                    momentum_scheduler, loss_fn, train_losses, validation_losses,
                     times, dataloader_train, dataloader_val, best_res,
-                    all_time_best_res, args.n_pc, args.n_clusters,
-                    args.cluster_path, args.timeout)
+                    all_time_best_res, args.n_pc, args.pc_path, args.timeout)
 
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        test_class_loss, test_regression_loss = validate(model, dataloader_test,
-                            class_loss_fn, trajectory_loss_fn, coeffs, means,
-                            centroids, optimizer, n_pc, n_clusters, True)
-        print("Test regression loss: %f" %test_regression_loss)
-        print("Test classification loss: %f" %test_class_loss)
+        test_loss = validate(model, dataloader_test, loss_fn, coeffs, means, n_pc, True)
+        print("Test loss: %f" %test_loss)
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
@@ -282,8 +252,7 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
 
     # NOT RNN
     data = get_data(path, args.manual_past_frames)
-    dataset = OurDataset(path, data, args.no_intention, args.only_lidar,
-                args.manual_past_frames, args.input_past_frames, args.output_future_frames)
+    dataset = OurDataset(path, data, args.no_intention, args.only_lidar, args.manual_past_frames, args.input_past_frames, args.output_future_frames)
     categories = numpy.array(dataset.categories)
     weights = [1]*len(categories)
     replacement = False
@@ -315,33 +284,20 @@ def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
                                sampler=sampler)
 
 def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
-                momentum_scheduler,  class_loss_fn, trajectory_loss_fn,
-                train_class_losses, validation_class_losses,
-                train_regression_losses, validation_regression_losses,
+                momentum_scheduler, loss_fn, train_losses, validation_losses,
                 times, dataloader_train, dataloader_val,
-                best_res, all_time_best_res, n_pc, n_clusters, cluster_path, timeout=None):
+                best_res, all_time_best_res, n_pc, pc_path, timeout=None):
 
     # Load principal component coefficient (or factor loadings) matrix
-    coeffs = numpy.genfromtxt(cluster_path + 'coeff.csv',delimiter=',')
+    coeffs = numpy.genfromtxt(pc_path + 'coeff.csv',delimiter=',')
 
     # Use only the n_pc first components
     coeffs = coeffs[:,0:n_pc]
     coeffs = Variable(torch.cuda.FloatTensor(coeffs), requires_grad=False)
 
     # Load mean of variables for PCA reconstruction
-    means = numpy.genfromtxt(cluster_path + 'variable_mean.csv',delimiter=',')
+    means = numpy.genfromtxt(pc_path + 'variable_mean.csv',delimiter=',')
     means = Variable(torch.cuda.FloatTensor(means), requires_grad=False)
-
-    # Load cluster centroids
-    centroids = numpy.genfromtxt(cluster_path + 'centroids.csv',delimiter=',')
-    centroids = Variable(torch.cuda.FloatTensor(centroids), requires_grad=False)
-    #n_clusters = centroids.shape[0]
-
-    # Load cluster indices for trajectories (used for debugging)
-    cluster_idx = numpy.genfromtxt(cluster_path + 'cluster_idx.csv',delimiter=',')
-
-    # Make zero-indexed for convenience
-    cluster_idx = cluster_idx - 1
 
     print("train network for a total of {diff} epochs."\
             " [{epochs}/{total_epochs}]".format( \
@@ -361,11 +317,8 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             batch_start_time = time.time()
 
             # Train model with current batch and save loss and duration
-            train_class_loss, train_regression_loss = train(model, batch,
-                class_loss_fn, trajectory_loss_fn, coeffs,means, centroids,
-                optimizer, n_pc, n_clusters)
-            train_class_losses.update(epoch + 1, i + 1, step, train_class_loss)
-            train_regression_losses.update(epoch + 1, i + 1, step, train_regression_loss)
+            train_loss = train(model, batch, loss_fn, coeffs, means, optimizer, n_pc)
+            train_losses.update(epoch + 1, i + 1, step, train_loss)
             times.update(epoch + 1, i + 1, step, time.time() - batch_start_time)
 
             #Update learning rate and momentum
@@ -375,7 +328,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
 
             # Print statistics
             if step % args.print_freq == 0:
-                print_statistics(train_regression_losses, times, len(dataloader_train))
+                print_statistics(train_losses, times, len(dataloader_train))
 
             # Check for timeout and possibly break
             if timeout is not None:
@@ -387,23 +340,17 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
 
             # Evaluate on validation set and save checkpoint
             if step % args.plot_freq == 0 and step != 0:
-                validation_class_loss, validation_regression_loss = validate(model,
-                    dataloader_val, class_loss_fn, trajectory_loss_fn, coeffs,
-                    means, centroids, optimizer, n_pc, n_clusters)
-
-                validation_class_losses.update(epoch + 1, i + 1, step, validation_class_loss)
-                validation_regression_losses.update(epoch + 1, i + 1, step, validation_regression_loss)
+                validation_loss = validate(model, dataloader_val, loss_fn, coeffs, means, n_pc)
+                validation_losses.update(epoch + 1, i + 1, step, validation_loss)
                 # Save losses to csv for plotting
-                save_statistic(train_class_losses, PATH_SAVE + 'train_class_losses.csv')
-                save_statistic(validation_class_losses, PATH_SAVE + 'validation_class_losses.csv')
-                save_statistic(train_regression_losses, PATH_SAVE + 'train_regression_losses.csv')
-                save_statistic(validation_regression_losses, PATH_SAVE + 'validation_regression_losses.csv')
+                save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
+                save_statistic(validation_losses, PATH_SAVE + 'validation_losses.csv')
 
                 # Store best loss value
-                is_best = validation_regression_loss < best_res
-                best_res = min(validation_regression_loss, best_res)
-                is_all_time_best = validation_regression_loss < all_time_best_res
-                all_time_best_res = min(validation_regression_loss, all_time_best_res)
+                is_best = validation_loss < best_res
+                best_res = min(validation_loss, best_res)
+                is_all_time_best = validation_loss < all_time_best_res
+                all_time_best_res = min(validation_loss, all_time_best_res)
 
                 # Save checkpoint
                 save_checkpoint({
@@ -421,10 +368,8 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                     'optimizer' : optimizer.state_dict(),
                     'lr_scheduler' : lr_scheduler.serialize(),
                     'momentum_scheduler' : momentum_scheduler.serialize(),
-                    'train_class_losses' : train_class_losses.serialize(),
-                    'validation_class_losses' : validation_class_losses.serialize(),
-                    'train_regression_losses' : train_regression_losses.serialize(),
-                    'validation_regression_losses' : validation_regression_losses.serialize(),
+                    'train_losses' : train_losses.serialize(),
+                    'validation_losses' : validation_losses.serialize(),
                     'times' : times.serialize()
                 }, is_best, is_all_time_best)
 
@@ -432,25 +377,19 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             #end of dataloader loop
 
         #print epoch results
-        print_statistics(train_regression_losses, times, len(dataloader_train))
+        print_statistics(train_losses, times, len(dataloader_train))
 
-        validation_class_loss, validation_regression_loss = validate(model,
-            dataloader_val, class_loss_fn, trajectory_loss_fn, coeffs, means,
-            centroids, optimizer, n_pc, n_clusters)
-
-        validation_class_losses.update(epoch + 1, i + 1, step, validation_class_loss)
-        validation_regression_losses.update(epoch + 1, i + 1, step, validation_regression_loss)
+        validation_loss = validate(model, dataloader_val, loss_fn, coeffs, means, n_pc)
+        validation_losses.update(epoch + 1, i + 1, step, validation_loss)
         # Save losses to csv for plotting
-        save_statistic(train_class_losses, PATH_SAVE + 'train_class_losses.csv')
-        save_statistic(validation_class_losses, PATH_SAVE + 'validation_class_losses.csv')
-        save_statistic(train_regression_losses, PATH_SAVE + 'train_regression_losses.csv')
-        save_statistic(validation_regression_losses, PATH_SAVE + 'validation_regression_losses.csv')
+        save_statistic(train_losses, PATH_SAVE + 'train_losses.csv')
+        save_statistic(validation_losses, PATH_SAVE + 'validation_losses.csv')
 
         # Store best loss value
-        is_best = validation_regression_loss < best_res
-        best_res = min(validation_regression_loss, best_res)
-        is_all_time_best = validation_regression_loss < all_time_best_res
-        all_time_best_res = min(validation_regression_loss, all_time_best_res)
+        is_best = validation_loss < best_res
+        best_res = min(validation_loss, best_res)
+        is_all_time_best = validation_loss < all_time_best_res
+        all_time_best_res = min(validation_loss, all_time_best_res)
 
         # Save checkpoint
         save_checkpoint({
@@ -468,18 +407,14 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
             'optimizer' : optimizer.state_dict(),
             'lr_scheduler' : lr_scheduler.serialize(),
             'momentum_scheduler' : momentum_scheduler.serialize(),
-            'train_class_losses' : train_class_losses.serialize(),
-            'validation_class_losses' : validation_class_losses.serialize(),
-            'train_regression_losses' : train_regression_losses.serialize(),
-            'validation_regression_losses' : validation_regression_losses.serialize(),
+            'train_losses' : train_losses.serialize(),
+            'validation_losses' : validation_losses.serialize(),
             'times' : times.serialize()
         }, is_best, is_all_time_best)
 
-        print('Validation complete. Final results: \n' \
-                'Regression loss {reg_losses.val:.4f} ({reg_losses.avg:.4f})\n'\
-                'Classification loss {class_losses.val:.4f} ({class_losses.avg:.4f})\n'\
-                .format(reg_losses=validation_regression_losses,
-                        class_losses=validation_class_losses))
+        print('Validation complete. Final results: \n'
+                'Loss {losses.val:.4f} ({losses.avg:.4f})'\
+                .format(losses=validation_losses))
 
         if time_is_out: return # Do not continue with next epoch if time is out
 
@@ -489,8 +424,7 @@ def print_statistics(losses, times, batch_length):
           'Batch loss {losses.val:.4f} ({losses.avg:.4f})'.format( losses.epoch,
            losses.batch, batch_length, batch_time=times, losses=losses))
 
-def train(model, batch, class_loss_fn, trajectory_loss_fn, coeffs, means,
-            centroids, optimizer, n_pc, n_clusters):
+def train(model, batch, loss_fn, coeffs, means, optimizer, n_pc):
     model.train() # switch to train mode
 
     # These are the lidar and value matrices used as input
@@ -500,61 +434,25 @@ def train(model, batch, class_loss_fn, trajectory_loss_fn, coeffs, means,
     # This is the ground truth trajectory
     targets = Variable((batch['output']).type(torch.cuda.FloatTensor))
 
-    # Get batch size for creating tensor views later
-    batch_size = targets.shape[0]
-
-    # Find the cluster index for each of the ground truth trajectories in batch
-    # NOTE target_class has been verified to work as expected
-    target_class = get_cluster_idx(targets, centroids)
-    target_class = Variable(target_class.cuda(), requires_grad=False)
-
-    # Compute principal component adjustments and predict the trajectory class
-    pc_deltas, class_logits = model(lidars,values)
-
-    # Make view of pc_delta
-    # from shape [batch_size, n_clusters * n_pc]
-    # to shape [batch_size, n_clusters, n_pc]
-    # NOTE view operation has been verified to work as expected
-    pc_deltas = pc_deltas.view(batch_size, n_clusters, n_pc)
-
-    # Get index of predicted class with highest value
-    #(not yet on the form of a probability distribution)
-    # NOTE max operation has been verified to work as expected
-    _, predicted_class = torch.max(class_logits,1)
-
-    # Compute loss on the class prediction. Class_loss then is a scalar tensor
-    # containing the average loss over observations in the minibatch.
-    class_loss = class_loss_fn(class_logits, target_class)
-
-    # Add deltas to predicted cluster centroid principal components
-    # NOTE everything from here up to and including pc_adjusted is verified to work as expected
-    predicted_centroid = centroids[predicted_class]
-    pc_centroid = torch.mm(predicted_centroid, coeffs) # [batch_size, 60] * [60, n_pc] = [batch_size, n_pc]
-    pc_deltas_predicted = pc_deltas[numpy.arange(0,batch_size),predicted_class]
-    pc_adjusted = torch.add(pc_centroid, pc_deltas_predicted)
+    # Compute principal components
+    pc = model(lidars,values)
 
     # Go from principal components to original projection
-    # NOTE predicted_trajectory is verified to work as expected
     # [batch_size, n_pc] * [n_pc, 60] = [batch_size, 60]
-    predicted_trajectory = torch.mm(pc_adjusted,coeffs.transpose(0,1)) + means
+    predicted_trajectory = torch.mm(pc,coeffs.transpose(0,1)) + means
 
-    # Compute loss on the adjusted trajectory
-    trajectory_loss = trajectory_loss_fn(predicted_trajectory, targets)
+    # Compute loss
+    loss = loss_fn(predicted_trajectory, targets)
 
-    # Compute the total loss as the sum of class loss and trajectory loss
-    total_loss = class_loss + trajectory_loss
+    optimizer.zero_grad() # reset gradients
+    loss.backward()
+    optimizer.step() # update weights
 
-    optimizer.zero_grad()
-    total_loss.backward()
-    optimizer.step()
+    return loss.data[0] # return loss for this batch
 
-    return class_loss.data, trajectory_loss.data
-
-def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means,
-            centroids, optimizer, n_pc, n_clusters, save_output=False):
+def validate(model, dataloader, loss_fn, coeffs, means, n_pc, save_output=False):
     model.eval() # switch to eval mode
-    regression_losses = ResultMeter() # Record trajectory MSE loss
-    class_losses = ResultMeter() # Record classification Crossentropy losses
+    losses = ResultMeter()
 
     for i, batch in enumerate(dataloader):
         # Read input and output into variables
@@ -563,48 +461,15 @@ def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means
         targets = Variable((batch['output']).type(torch.cuda.FloatTensor))#,volatile=True)
         indices = batch['index']
 
-        # Get batch size for creating tensor views later
-        batch_size = targets.shape[0]
-
-        # Find the cluster index for each of the ground truth trajectories in batch
-        # NOTE target_class has been verified to work as expected
-        target_class = get_cluster_idx(targets, centroids)
-        target_class = Variable(target_class.cuda(), requires_grad=False)
-
-        # Compute principal component adjustments and predict the trajectory class
-        pc_deltas, class_logits = model(lidars,values)
-
-        # Make view of pc_delta
-        # from shape [batch_size, n_clusters * n_pc]
-        # to shape [batch_size, n_clusters, n_pc]
-        # NOTE view operation has been verified to work as expected
-        pc_deltas = pc_deltas.view(batch_size, n_clusters, n_pc)
-
-        # Get index of predicted class with highest value
-        #(not yet on the form of a probability distribution)
-        # NOTE max operation has been verified to work as expected
-        _, predicted_class = torch.max(class_logits,1)
-
-        # Compute loss on the class prediction. Class_loss then is a scalar tensor
-        # containing the average loss over observations in the minibatch.
-        class_loss = class_loss_fn(class_logits, target_class)
-
-        # Add deltas to predicted cluster centroid principal components
-        # NOTE everything from here up to and including pc_adjusted is verified to work as expected
-        predicted_centroid = centroids[predicted_class]
-        pc_centroid = torch.mm(predicted_centroid, coeffs) # [batch_size, 60] * [60, n_pc] = [batch_size, n_pc]
-        pc_deltas_predicted = pc_deltas[numpy.arange(0,batch_size),predicted_class]
-        pc_adjusted = torch.add(pc_centroid, pc_deltas_predicted)
+        # Compute principal components
+        pc = model(lidars,values)
 
         # Go from principal components to original projection
-        # NOTE predicted_trajectory is verified to work as expected
-        predicted_trajectory = torch.mm(pc_adjusted,coeffs.transpose(0,1)) + means
+        # [batch_size, n_pc] * [n_pc, 60] = [batch_size, 60]
+        predicted_trajectory = torch.mm(pc, coeffs.transpose(0,1)) + means
 
-        # Compute loss on the adjusted trajectory
-        trajectory_loss = trajectory_loss_fn(predicted_trajectory, targets)
-
-        # Compute the total loss as the sum of class loss and trajectory loss
-        total_loss = class_loss + trajectory_loss
+        # Compute loss
+        loss = loss_fn(predicted_trajectory, targets)
 
         # Save generated predictions to file
         if save_output:
@@ -614,16 +479,15 @@ def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means
             generate_output(indices, outputs, batch['foldername'], path)
 
         # Document results
-        regression_losses.update(0, 0, i, trajectory_loss.data[0])
-        class_losses.update(0, 0, i, class_loss.data[0])
+        losses.update(0, 0, i, loss.data[0])
 
         # Print statistics
         if i % args.print_freq == 0:
             print('Validation: [{batch}/{total}]\t'
-                  'Regression Loss {regression_losses.val:.4f}({regression_losses.avg:.4f})'.format( batch = i,
-                    total = len(dataloader), regression_losses=regression_losses))
+                  'Loss {losses.val:.4f} ({losses.avg:.4f})'.format( batch = i,
+                    total = len(dataloader), losses=losses))
 
-    return class_losses.avg, regression_losses.avg
+    return losses.avg
 
 def generate_output(indices, outputs, foldername, path):
     if not os.path.exists(path):
@@ -677,18 +541,6 @@ def write_info_file():
         file = open(PATH_SAVE + "info.txt", "w")
         file.write(info)
         file.close()
-
-def get_cluster_idx(points, centroids):
-    # Use the squared euclidean distance, since that was used when
-    # constructing cluster centroids.
-    indices = []
-    for point in points:
-        # Calculate distance from point to each centroid
-        distances = torch.FloatTensor([(point - c).pow(2).sum() for c in centroids])
-        cluster_idx = torch.argmin(distances)
-        indices.append(cluster_idx)
-
-    return torch.LongTensor(indices)
 
 if __name__ == '__main__':
     main()
