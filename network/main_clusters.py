@@ -134,14 +134,6 @@ if args.scheduler and (learning_rate == 0 or momentum == 0):
     print("\n SCHEDULER WARNING: Could not find learning rate or momentum with regex. \
         Learning rate is " + str(learning_rate) + " and momentum is " + str(momentum) )
 
-# start matlab engine
-#eng = matlab.engine.start_matlab()
-#matlab_wd = '/home/annaochjacob/Repos/exjobb/preprocessing/path_clustering/'
-#eng.addpath(matlab_wd)
-#eng.cd(matlab_wd)
-
-# Load centroid
-
 def main():
 
     #write info file
@@ -196,6 +188,7 @@ def main():
         if args.scheduler:
             lr_scheduler.setValues(len(dataloader_train)*args.epochs, learning_rate/10, learning_rate)
             momentum_scheduler.setValues(len(dataloader_train)*args.epochs, momentum+0.05, momentum-0.05)
+
     #resume from checkpoint
     if args.resume:
         print("----Resume from checkpoint:-----")
@@ -203,6 +196,7 @@ def main():
         if checkpoint is None:
             print("No file found. Exiting...")
             return
+
         # model
         print("\t Creating network")
         args.arch = checkpoint['arch']
@@ -214,14 +208,16 @@ def main():
         n_ipf = str(len(args.input_past_frames))
         n_off = str(len(args.output_future_frames))
         n_mpf = str(len(args.manual_past_frames))
-        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(n_pc) + ', ' + str(n_clusters)
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(args.n_pc) + ', ' + str(args.n_clusters)
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
+
         # loss function and optimizer
         print("\t Creating lossfunction and optimizer")
         args.optim = checkpoint['optim']
-        loss_fn = torch.nn.MSELoss().cuda()
+        trajectory_loss_fn = torch.nn.MSELoss().cuda()
+        class_loss_fn = torch.nn.CrossEntropyLoss().cuda()
         optimizer = eval('torch.optim.' + args.optim)
 
         #load variables
@@ -256,11 +252,37 @@ def main():
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
+
+        centroids = get_cluster_centroids(args.cluster_path)
+        coeffs, means = get_pca_values(args.cluster_path, args.n_pc)
         test_class_loss, test_regression_loss = validate(model, dataloader_test,
                             class_loss_fn, trajectory_loss_fn, coeffs, means,
-                            centroids, optimizer, n_pc, n_clusters, True)
+                            centroids, optimizer, args.n_pc, args.n_clusters, True)
+
         print("Test regression loss: %f" %test_regression_loss)
         print("Test classification loss: %f" %test_class_loss)
+
+        write_test_loss_file(test_regression_loss, test_class_loss)
+
+def get_cluster_centroids(cluster_path):
+    # Load cluster centroids
+    centroids = numpy.genfromtxt(cluster_path + 'centroids.csv',delimiter=',')
+    centroids = Variable(torch.cuda.FloatTensor(centroids), requires_grad=False)
+    return centroids
+
+def get_pca_values(cluster_path, n_pc):
+    # Load principal component coefficient (or factor loadings) matrix
+    coeffs = numpy.genfromtxt(cluster_path + 'coeff.csv',delimiter=',')
+
+    # Use only the n_pc first components
+    coeffs = coeffs[:,0:n_pc]
+    coeffs = Variable(torch.cuda.FloatTensor(coeffs), requires_grad=False)
+
+    # Load mean of variables for PCA reconstruction
+    means = numpy.genfromtxt(cluster_path + 'variable_mean.csv',delimiter=',')
+    means = Variable(torch.cuda.FloatTensor(means), requires_grad=False)
+
+    return coeffs, means
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
@@ -321,27 +343,8 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                 times, dataloader_train, dataloader_val,
                 best_res, all_time_best_res, n_pc, n_clusters, cluster_path, timeout=None):
 
-    # Load principal component coefficient (or factor loadings) matrix
-    coeffs = numpy.genfromtxt(cluster_path + 'coeff.csv',delimiter=',')
-
-    # Use only the n_pc first components
-    coeffs = coeffs[:,0:n_pc]
-    coeffs = Variable(torch.cuda.FloatTensor(coeffs), requires_grad=False)
-
-    # Load mean of variables for PCA reconstruction
-    means = numpy.genfromtxt(cluster_path + 'variable_mean.csv',delimiter=',')
-    means = Variable(torch.cuda.FloatTensor(means), requires_grad=False)
-
-    # Load cluster centroids
-    centroids = numpy.genfromtxt(cluster_path + 'centroids.csv',delimiter=',')
-    centroids = Variable(torch.cuda.FloatTensor(centroids), requires_grad=False)
-    #n_clusters = centroids.shape[0]
-
-    # Load cluster indices for trajectories (used for debugging)
-    cluster_idx = numpy.genfromtxt(cluster_path + 'cluster_idx.csv',delimiter=',')
-
-    # Make zero-indexed for convenience
-    cluster_idx = cluster_idx - 1
+    coeffs, means = get_pca_values(cluster_path,n_pc)
+    centroids = get_cluster_centroids(cluster_path)
 
     print("train network for a total of {diff} epochs."\
             " [{epochs}/{total_epochs}]".format( \
@@ -608,8 +611,8 @@ def validate(model, dataloader, class_loss_fn, trajectory_loss_fn, coeffs, means
 
         # Save generated predictions to file
         if save_output:
-            current_batch_size = numpy.size(output,0)
-            outputs = numpy.split(output.data, current_batch_size, 0)
+            current_batch_size = numpy.size(predicted_trajectory,0)
+            outputs = numpy.split(predicted_trajectory.data, current_batch_size, 0)
             path = PATH_SAVE + 'generated_output/'
             generate_output(indices, outputs, batch['foldername'], path)
 
@@ -677,6 +680,12 @@ def write_info_file():
         file = open(PATH_SAVE + "info.txt", "w")
         file.write(info)
         file.close()
+
+def write_test_loss_file(regression_loss, class_loss):
+    loss_txt = 'Regression loss: %.5f \n Class loss: %.5f' %(regression_loss, class_loss)
+    file = open(PATH_SAVE + "test_loss.txt", "w")
+    file.write(loss_txt)
+    file.close()
 
 def get_cluster_idx(points, centroids):
     # Use the squared euclidean distance, since that was used when

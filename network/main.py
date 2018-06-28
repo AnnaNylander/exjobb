@@ -15,7 +15,7 @@ from architectures import *
 from data_to_dict import get_data
 from dataset import OurDataset, RNNDataset
 from scheduler import Scheduler
-from settings import Settings
+#from settings import Settings
 #from architectures.network import LucaNetwork, SmallerNetwork1, SmallerNetwork2
 from result_meter import ResultMeter
 
@@ -228,6 +228,7 @@ def main():
     if args.evaluate:
         print("_____EVALUATE MODEL______")
         test_loss = validate(model, dataloader_test, loss_fn, True)
+
         print("Test loss: %f" %test_loss)
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):

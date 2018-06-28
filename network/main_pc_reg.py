@@ -229,8 +229,23 @@ def main():
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        test_loss = validate(model, dataloader_test, loss_fn, coeffs, means, n_pc, True)
+        coeffs, means = get_pca_values(pc_path, args.n_pc)
+        test_loss = validate(model, dataloader_test, loss_fn, coeffs, means, args.n_pc, True)
         print("Test loss: %f" %test_loss)
+
+def get_pca_values(cluster_path, n_pc):
+    # Load principal component coefficient (or factor loadings) matrix
+    coeffs = numpy.genfromtxt(cluster_path + 'coeff.csv',delimiter=',')
+
+    # Use only the n_pc first components
+    coeffs = coeffs[:,0:n_pc]
+    coeffs = Variable(torch.cuda.FloatTensor(coeffs), requires_grad=False)
+
+    # Load mean of variables for PCA reconstruction
+    means = numpy.genfromtxt(cluster_path + 'variable_mean.csv',delimiter=',')
+    means = Variable(torch.cuda.FloatTensor(means), requires_grad=False)
+
+    return coeffs, means
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
@@ -289,15 +304,7 @@ def main_loop(epoch_start, step_start, model, optimizer, lr_scheduler,
                 best_res, all_time_best_res, n_pc, pc_path, timeout=None):
 
     # Load principal component coefficient (or factor loadings) matrix
-    coeffs = numpy.genfromtxt(pc_path + 'coeff.csv',delimiter=',')
-
-    # Use only the n_pc first components
-    coeffs = coeffs[:,0:n_pc]
-    coeffs = Variable(torch.cuda.FloatTensor(coeffs), requires_grad=False)
-
-    # Load mean of variables for PCA reconstruction
-    means = numpy.genfromtxt(pc_path + 'variable_mean.csv',delimiter=',')
-    means = Variable(torch.cuda.FloatTensor(means), requires_grad=False)
+    coeffs, means = get_pca_values(pc_path, n_pc)
 
     print("train network for a total of {diff} epochs."\
             " [{epochs}/{total_epochs}]".format( \
@@ -541,6 +548,12 @@ def write_info_file():
         file = open(PATH_SAVE + "info.txt", "w")
         file.write(info)
         file.close()
+
+def write_test_loss_file(loss):
+    loss_txt = 'Loss: %.5f' %loss
+    file = open(PATH_SAVE + "test_loss.txt", "w")
+    file.write(loss_txt)
+    file.close()
 
 if __name__ == '__main__':
     main()
