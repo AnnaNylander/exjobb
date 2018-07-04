@@ -23,12 +23,15 @@ parser.add_argument('-r','--recorded_data', metavar='path',
 parser.add_argument('-m','--models', metavar='path',
                     dest='saved_models',
                     help='Foldername of model, e.g. LucaNet/ (with trailing /)')
-parser.add_argument('-ipf', '--input_past_frames', default='1 2 3 4 5', type=str,
+parser.add_argument('-ipf', '--input_past_frames', default='1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30', type=str,
                     metavar='\'1 2 3\'', help = 'Which past frames we want to plot. \
                     List which frames you want manually. Ex: \'1 3 5 7 10 13 16\'')
-parser.add_argument('-off', '--output_future_frames', default='1 2 3 4 5', type=str,
+parser.add_argument('-off', '--output_future_frames', default='1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30', type=str,
                     metavar='\'1 2 3\'', help = 'Which future frames we want to plot. \
-                    List which frames you want manually. Ex: \'1 3 5 7 10 13 16\'')
+                    List which frames you want manually. Ex: \'1 3 5 7 10 13 16\''),
+parser.add_argument('-s','--subset', metavar='name',
+                    dest='subset',
+                    help='Foldername of subset (without trailing /) to use with individual steps, e.g. birb')
 args = parser.parse_args()
 
 ROI = 60
@@ -48,10 +51,10 @@ def main():
     future_idx = np.array([int(i) for i in args.output_future_frames.split(' ')])
 
     # if only one time step
-    #if args.time_step is not None:
-    #    visualize(args.time_step, past_idx, future_idx, args.prediction,
-    #                args.everything, folder=folder+'/')
-    #    return
+    if args.time_step is not None:
+        visualize(args.time_step, past_idx, future_idx, args.prediction,
+                    args.everything, folder=args.subset)
+        return
 
     # else save all
     for folder in os.listdir(PATH_DATA):
@@ -79,7 +82,8 @@ def plot(x, y ,c , image ,subplot_rows, subplot_cols, subplot_index, title, side
     axes.set_xlim([-side/2, side/2])
     axes.set_ylim([-side/2, side/2])
     axes.set_aspect('equal')
-    axes.set_title(title)
+    #axes.set_title(title)
+    plt.axis('off')
 
 def get_values(values_path, current_step, other_steps):
     ''' Returns the values at the given time steps.
@@ -129,8 +133,11 @@ def visualize(current_idx, past_idx, future_idx, prediction, everything, folder=
     topview_img = lidar_to_topview(point_cloud, ROI, CELLS)
     topview_img = topview_img.squeeze()
 
-    future_idx = np.array(list(range(0,31)))
-    past_idx = -future_idx
+    # Make topview white instead of black
+    topview_img = 255 - topview_img
+
+    #future_idx = np.array(list(range(0,31)))
+    #past_idx = -future_idx
     path_values = PATH_DATA + folder + '/values.csv'
 
     #past
@@ -167,7 +174,8 @@ def visualize(current_idx, past_idx, future_idx, prediction, everything, folder=
                 SUBPLOT_COLS, 4,'Steer',SIDE)
 
     filepath = path_save + '%s_%i.png' %(re.sub('\/','',folder), current_idx)
-    plt.savefig(filepath)
+    plt.savefig(filepath,bbox_inches='tight',dpi=100)
+    print('Saved:', filepath)
 
 if __name__ == "__main__":
     main()

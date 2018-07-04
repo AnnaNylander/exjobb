@@ -1,7 +1,7 @@
 %% Run this script to save cluster and PCA matrices.
 
 % Set number of clusters
-n_clusters = 10;
+n_clusters = 9;
 
 %% Read all trajectories
 top_dir = '/media/annaochjacob/crucial/dataset/flexible/train/';
@@ -25,7 +25,7 @@ csvwrite('variable_mean.csv', means);
 
 %% Perform k-means clustering
 disp('Running k-means clustering algorithm...')
-[idx,C] = kmeans(trajectories, n_clusters, 'MaxIter', 100);
+[idx,C] = kmeans(trajectories, n_clusters, 'MaxIter', 200);
 csvwrite('centroids.csv', C) % Save cluster centroids
 csvwrite('cluster_idx.csv', idx);
 
@@ -38,10 +38,11 @@ csvwrite('coeff.csv',coeff);
 disp('Plotting clusters...')
 for c = 1:n_clusters
     c
-    if mod(c,20) == 1
-        figure
-    end
-    subplot(4,5, mod(c,20)+1)
+    %if mod(c,20) == 1
+    %    figure
+    %end
+    %subplot(4,5, mod(c,20)+1)
+    subplot(3,3, c)
     hold on
    for i = 1:length(trajectories)
         if idx(i) == c && mod(i,10) == 0
@@ -52,3 +53,6 @@ for c = 1:n_clusters
     axis([-25 25 0 30])
     p(1).LineWidth = 2;
 end
+
+saveas(gcf,'9_clusters.png')
+saveas(gcf,'9_clusters.svg')
