@@ -192,7 +192,7 @@ def main():
         n_ipf = str(len(args.input_past_frames))
         n_off = str(len(args.output_future_frames))
         n_mpf = str(len(args.manual_past_frames))
-        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off
+        model_arg_string = n_mpf + ', ' + n_ipf + ', ' + n_off + ', ' + str(args.n_pc)
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
@@ -229,7 +229,7 @@ def main():
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        coeffs, means = get_pca_values(pc_path, args.n_pc)
+        coeffs, means = get_pca_values(args.pc_path, args.n_pc)
         test_loss = validate(model, dataloader_test, loss_fn, coeffs, means, args.n_pc, True)
         print("Test loss: %f" %test_loss)
 
@@ -480,8 +480,8 @@ def validate(model, dataloader, loss_fn, coeffs, means, n_pc, save_output=False)
 
         # Save generated predictions to file
         if save_output:
-            current_batch_size = numpy.size(output,0)
-            outputs = numpy.split(output.data, current_batch_size, 0)
+            current_batch_size = numpy.size(predicted_trajectory,0)
+            outputs = numpy.split(predicted_trajectory.data, current_batch_size, 0)
             path = PATH_SAVE + 'generated_output/'
             generate_output(indices, outputs, batch['foldername'], path)
 

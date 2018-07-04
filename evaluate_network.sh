@@ -10,16 +10,19 @@ DATASET=flexible/
 N_DRIVE_FRAMES=100 # The number of frames that the car should drive in CARLA
 
 # These values are to be set for every network
-FOLDER_NAME=test_deluxe/cluster_1_100_cl_7_pc/
-NETWORK_FILE=cluster_1
-NETWORK_CLASS=ClusterNet
+FOLDER_NAME=test_deluxe/pc_reg_1_with_20_pc/
+NETWORK_FILE=pc_reg_1
+NETWORK_CLASS=PCNet
 CLUSTER_PATH='/home/annaochjacob/Repos/exjobb/preprocessing/path_clustering/'
 
 echo "*** Evaluating network on test set in order to generate predictions ***"
 #python3 network/main.py \
-python3 network/main_clusters.py \
-                        -ncl 100 \
-                        -npc 7 \
+#python3 network/main_clusters.py \
+                        #-ncl 100 \
+                        #-npc 7 \
+                        #-cpath ${CLUSTER_PATH}100_clusters/ \
+python3 network/main_pc_reg.py \
+                        -npc 20 \
                         -cpath ${CLUSTER_PATH}100_clusters/ \
                         -e $EPOCHS \
                         -b $BATCH_SIZE \
@@ -37,8 +40,8 @@ python3 network/main_clusters.py \
 echo "*** Saving training and validation loss plot ***"
 python3 plot_network_loss.py -m ${FOLDER_NAME}
 
-echo "*** Saving visualizations of the generated predictions ***"
-python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATASET}test/
+#echo "*** Saving visualizations of the generated predictions ***"
+#python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATASET}test/
 
 #echo "*** Copying the network into carla repo so it can be used for driving ***"
 #cp ./network/architectures/${NETWORK_FILE}.py ./carla/PythonClient/

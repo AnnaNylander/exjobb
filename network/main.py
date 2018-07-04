@@ -230,6 +230,7 @@ def main():
         test_loss = validate(model, dataloader_test, loss_fn, True)
 
         print("Test loss: %f" %test_loss)
+        write_test_loss_file(test_loss)
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
@@ -513,6 +514,12 @@ def write_info_file():
         file = open(PATH_SAVE + "info.txt", "w")
         file.write(info)
         file.close()
+
+def write_test_loss_file(loss):
+    loss_txt = 'Loss: %.5f' %loss
+    file = open(PATH_SAVE + "test_loss.txt", "w")
+    file.write(loss_txt)
+    file.close()
 
 if __name__ == '__main__':
     main()
