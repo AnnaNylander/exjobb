@@ -158,9 +158,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance, sampler_max=100)
-        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False,  sampler_max=100)
-    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False,  sampler_max=100)
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance)
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False)
+    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -459,7 +459,6 @@ def train(model, batch, loss_fn, MSE_loss_fn, optimizer):
     loss = loss_fn(output, classification_targets)
 
     center_of_masses = get_coords_from_predictions(output,args.resolution)
-    #print(center_of_masses)
     MSE_loss = MSE_loss_fn(torch.tensor(center_of_masses), targets)
 
     optimizer.zero_grad() # reset gradients
@@ -513,33 +512,51 @@ def validate(model, dataloader, loss_fn, MSE_loss_fn, save_output=False):
     return losses.avg, MSE_losses.avg
 
 def get_coords_from_predictions(output,resolution):
+
+    # MAY KEEP COMMENTS FOR DEBUGGING PURPOSES
     #print('output.data:',len(output.data))
     #for example in output.data:
     #    print('example:',len(example))
     #    for layer in example:
     #        print('layer:',len(layer))
     #        l = layer.cpu().numpy()
-    #        coords = prediction_to_coords(resolution, l)
-    #        print(coords)
-    #        plt.imshow(l)
-    #        Här kan man tänka sig att plotta predikterade positionen i bilden
-    #        d.v.s. vi tar fram pixel-koordinater och plottar innan vi tar fram relativa koordinaterna
-    #        plt.show()
+    #        px, py = prediction_to_pixel_coords(l)
+    #        #coords = prediction_to_coords(resolution, l)
+    #        print(px,py)
+            #plt.imshow(l)
+        #Här kan man tänka sig att plotta predikterade positionen i bilden
+            #d.v.s. vi tar fram pixel-koordinater och plottar innan vi
+            # tar fram relativa koordinaterna
+            #plt.scatter(px, py)
+            #plt.show()
     #center_of_masses = 0
-
 
     center_of_masses = [[prediction_to_coords(resolution, layer.cpu().numpy()) for layer in example] for example in output.data]
     center_of_masses = numpy.array(center_of_masses)
     center_of_masses = numpy.reshape(center_of_masses, (len(center_of_masses), -1))
     return center_of_masses
 
-def prediction_to_coords(resolution, layer, roi=60):
-    width, height = resolution
+def prediction_to_pixel_coords(prediction):
     # Set all predicted values below 0.5 to 0
-    layer[numpy.where(layer < 0.5)] = 0
+    prediction[numpy.where(prediction < 0.5)] = 0
 
     # Calculate the center of mass of the remaining predicted values
-    px,py = list(ndimage.measurements.center_of_mass(layer))
+    coords = ndimage.measurements.center_of_mass(prediction)
+    if numpy.isnan(coords).any():
+        # There were only zeros in the predictions, so center_of_mass could not
+        # handle it. Let's define it as having center of mass equal to (0,0)
+        coords = (0,0)
+        #print('Coords are nan!')
+        #print('Prediction contains nan:',numpy.isnan(prediction).any())
+        #print('Min prediction values:',numpy.amin(prediction))
+        #print('Max prediction values:',numpy.amax(prediction))
+    return coords[0], coords[1]
+
+def prediction_to_coords(resolution, layer, roi=60):
+    px, py = prediction_to_pixel_coords(layer)
+
+    # Convert from pixel coordinate system to vehicle relative system
+    width, height = resolution
     x = (px-(width/2))/(width/roi)
     y = (py-(height/2))/(height/roi)
     return [x,y]
