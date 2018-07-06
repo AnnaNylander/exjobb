@@ -456,6 +456,8 @@ def train(model, batch, loss_fn, MSE_loss_fn, optimizer):
     classification_targets = Variable(classification_targets).type(torch.cuda.FloatTensor)
 
     output = model(lidars, values) # batch x layer x witdh x height
+    #plt.imshow(output.data[0][0])
+    #plt.show()
     loss = loss_fn(output, classification_targets)
 
     center_of_masses = get_coords_from_predictions(output,args.resolution)
@@ -493,10 +495,12 @@ def validate(model, dataloader, loss_fn, MSE_loss_fn, save_output=False):
         # Save generated predictions to file
         if save_output:
             current_batch_size = numpy.size(output,0)
+            # Split the arrays in batch examples.
             center_of_masses = numpy.split(center_of_masses, current_batch_size, 0)
+            semantic_segmentation = numpy.split(output.data, current_batch_size, 0)
+
             path = PATH_SAVE + 'generated_output/'
-            center_of_masses = numpy.array(center_of_masses)
-            generate_output(indices, center_of_masses, batch['foldername'], path)
+            generate_output(indices, center_of_masses, semantic_segmentation, batch['foldername'], path)
 
         # Document results
         losses.update(0, 0, i, loss.data[0])
@@ -589,19 +593,31 @@ def get_ground_truth(size, pos, radius):
     ground_truth = numpy.stack(batch, axis=0) # batch x steps x width x height
     return torch.tensor(ground_truth)
 
-def generate_output(indices, outputs, foldername, path):
+def generate_output(indices, outputs, semantic_segmentation, foldername, path):
+
     if not os.path.exists(path):
         os.makedirs(path)
+
     for i, output in enumerate(outputs):
-        #print(foldername[i])
-        subpath = path + str(foldername[i]) + '/'
-        if not os.path.exists(subpath):
-            os.makedirs(subpath)
-# TODO här kraschar det!!
-        output = output.view(2,-1)#.transpose(0,1)
-        filename = subpath + 'gen_%i.csv' %(int(indices[i]))
+        subpath_coords = path + str(foldername[i]) + '/coords/'
+        if not os.path.exists(subpath_coords):
+            os.makedirs(subpath_coords)
+
+        output = numpy.reshape(output, (2,-1)).transpose(1,0) # format the output
+        filename = subpath_coords + 'gen_%i.csv' %(int(indices[i]))
         numpy.savetxt(filename, output, comments='', delimiter=',',fmt='%.8f',
                         header='x,y')
+
+    for i, sem_seg in enumerate(semantic_segmentation):
+        subpath_semseg = path + str(foldername[i]) + '/semantic_segmentation/'
+        if not os.path.exists(subpath_semseg):
+            os.makedirs(subpath_semseg)
+
+        sem_seg = sem_seg.data[0].cpu().numpy() # convert from tensor to np array
+
+        for j, ss in enumerate(sem_seg):
+            filename = subpath_semseg + 'gen_%i_%i.csv' %(int(indices[i]),j)
+            numpy.savetxt(filename, ss, comments='', delimiter=',')
 
 def save_checkpoint(state, is_best, is_all_time_best,
                     filename = PATH_SAVE + 'checkpoint.pt'):
@@ -645,3 +661,4 @@ def write_info_file():
 
 if __name__ == '__main__':
     main()
+
