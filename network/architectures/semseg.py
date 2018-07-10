@@ -77,8 +77,10 @@ class Network(nn.Module):
         self.conv_d0 = nn.Conv2d(16,16,3, padding=1)
         self.bias_d0 = nn.Linear(self.vs, 16 )
 
-        self.conv_d1 = nn.Conv2d(16,6,3, padding=1)
-        self.bias_d1 = nn.Linear(self.vs, 6 )
+        self.conv_d1 = nn.Conv2d(16,16,3, padding=1)
+        self.bias_d1 = nn.Linear(self.vs, 16 )
+
+        self.conv_d2 = nn.Conv2d(16,6,3, padding=1)
 
         self.sigmoid = nn.Sigmoid()
 
@@ -178,9 +180,11 @@ class Network(nn.Module):
         b = expand_biases(b,150,150)                            # [batch, 16, 150, 150]
         l = F.elu(torch.add(self.conv_d0(l), 1, b))             # [batch, 16, 150, 150]
 
-        b = F.elu(self.bias_d1(v))                              # [batch, 6]
-        b = expand_biases(b,150,150)                            # [batch, 6, 150, 150]
-        l = F.elu(torch.add(self.conv_d1(l), 1, b))             # [batch, 6, 150, 150]
+        b = F.elu(self.bias_d1(v))                              # [batch, 16]
+        b = expand_biases(b,150,150)                            # [batch, 16, 150, 150]
+        l = F.elu(torch.add(self.conv_d1(l), 1, b))             # [batch, 16, 150, 150]
+
+        l = self.conv_d2(l)                                     # [batch, 6, 150, 150]
 
         y = self.sigmoid(l)
 

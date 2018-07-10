@@ -86,7 +86,7 @@ parser.add_argument('-t', '--timeout', default=None, type=int, dest='timeout',
 
 parser.add_argument('-res', '--resolution', nargs=2, default=[300,300], type=int, dest='resolution',
                     metavar=('N','N'), help='Resolution of the output, e.g. 300x300 pixels. (default= 300 300)')
-parser.add_argument('-r', '--radius', default=None, type=int, dest='radius',
+parser.add_argument('-r', '--radius', default=None, type=float, dest='radius',
                     metavar='N', help='The radius in meters of the target path circles for semantic segmentation idea (default=5)')
 
 
@@ -158,9 +158,9 @@ def main():
     # Load datasets
     print("-----Loading datasets-----")
     if not args.evaluate:
-        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance)
-        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False)
-    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False)
+        dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance, sampler_max= None)
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False, sampler_max= 1000)
+    dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False, sampler_max= None)
 
     # create new model and lossfunctions and stuff
     if not args.resume:
@@ -192,7 +192,8 @@ def main():
         print("\t Creating network")
         args.arch = checkpoint['arch']
         args.resolution = checkpoint['resolution']
-        args.radius = checkpoint['radius']
+        if args.radius is None:
+            args.radius = checkpoint['radius']
         args.past_frames = checkpoint['past_frames']
         args.frame_stride = checkpoint['frame_stride']
         args.manual_past_frames = checkpoint['manual_past_frames']
@@ -242,9 +243,9 @@ def main():
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        test_loss = validate(model, dataloader_test, loss_fn, MSE_loss_fn, True)
-
-        print("Test loss: %f" %test_loss)
+        test_class_loss, test_MSE_loss = validate(model, dataloader_test, loss_fn, MSE_loss_fn, True)
+        print("Test loss: %f" %test_MSE_loss)
+        write_test_loss_file(test_class_loss, test_MSE_loss)
 
 def get_data_loader(path, shuffle=False, balance=False, sampler_max = None):
     # We need to load data differently depending on the architecture
@@ -452,15 +453,31 @@ def train(model, batch, loss_fn, MSE_loss_fn, optimizer):
     values = Variable((batch['value']).type(torch.cuda.FloatTensor))
     targets = batch['output']
 
+    # DONE kolla så classification_targets ser bra ut och är vänt åt rätt håll..
     classification_targets = get_ground_truth(args.resolution,(targets),radius=args.radius)
     classification_targets = Variable(classification_targets).type(torch.cuda.FloatTensor)
 
+    center_of_mass = get_coords_from_predictions(classification_targets,args.resolution)
+    #print(classification_targets.shape)
+    #print(targets.shape)
+    #print(targets[0])
+    #print(center_of_mass[0])
+    #plt.imshow(classification_targets[0,5,:,:])
+    #plt.show()
+
     output = model(lidars, values) # batch x layer x witdh x height
+    #fig, axes = plt.subplots()
+    #os = output[0,:,:,:].data.cpu().numpy()
+    #axes[].plot(x, y)
+    #plt.imshow(os[0])
+    #plt.show()
     #plt.imshow(output.data[0][0])
     #plt.show()
     loss = loss_fn(output, classification_targets)
 
+    # TODO titta i matla hur outputen ser ut.
     center_of_masses = get_coords_from_predictions(output,args.resolution)
+    # TODO plotta var center of masses är jämfört med targets.
     MSE_loss = MSE_loss_fn(torch.tensor(center_of_masses), targets)
 
     optimizer.zero_grad() # reset gradients
@@ -517,52 +534,50 @@ def validate(model, dataloader, loss_fn, MSE_loss_fn, save_output=False):
 
 def get_coords_from_predictions(output,resolution):
 
-    # MAY KEEP COMMENTS FOR DEBUGGING PURPOSES
-    #print('output.data:',len(output.data))
-    #for example in output.data:
-    #    print('example:',len(example))
-    #    for layer in example:
-    #        print('layer:',len(layer))
-    #        l = layer.cpu().numpy()
-    #        px, py = prediction_to_pixel_coords(l)
-    #        #coords = prediction_to_coords(resolution, l)
-    #        print(px,py)
-            #plt.imshow(l)
-        #Här kan man tänka sig att plotta predikterade positionen i bilden
-            #d.v.s. vi tar fram pixel-koordinater och plottar innan vi
-            # tar fram relativa koordinaterna
-            #plt.scatter(px, py)
-            #plt.show()
-    #center_of_masses = 0
 
-    center_of_masses = [[prediction_to_coords(resolution, layer.cpu().numpy()) for layer in example] for example in output.data]
-    center_of_masses = numpy.array(center_of_masses)
-    center_of_masses = numpy.reshape(center_of_masses, (len(center_of_masses), -1))
+    #center_of_masses = [[prediction_to_coords(resolution, layer.cpu().numpy()) for layer in example] for example in output.data]
+    #center_of_masses = numpy.array(center_of_masses)
+    #center_of_masses = numpy.reshape(center_of_masses, (len(center_of_masses), -1))
+    #batch
+    batch_coords =[]
+    for example in output.data:
+        #example from batch
+        x_coords = []
+        y_coords = []
+        for layer in example:
+            x,y = prediction_to_coords(resolution, layer.cpu().numpy())
+            x_coords.append(x)
+            y_coords.append(y)
+        coords = x_coords + y_coords
+        batch_coords.append(coords)
+    center_of_masses = numpy.array(batch_coords)
     return center_of_masses
 
-def prediction_to_pixel_coords(prediction):
+def prediction_to_pixel_coords(resolution, prediction):
     # Set all predicted values below 0.5 to 0
-    prediction[numpy.where(prediction < 0.5)] = 0
+    #prediction[numpy.where(prediction < 0.5)] = 0
 
     # Calculate the center of mass of the remaining predicted values
-    coords = ndimage.measurements.center_of_mass(prediction)
-    if numpy.isnan(coords).any():
+
+    y,x = ndimage.measurements.center_of_mass(prediction)
+    if numpy.isnan([x,y]).any():
         # There were only zeros in the predictions, so center_of_mass could not
         # handle it. Let's define it as having center of mass equal to (0,0)
-        coords = (0,0)
-        #print('Coords are nan!')
-        #print('Prediction contains nan:',numpy.isnan(prediction).any())
-        #print('Min prediction values:',numpy.amin(prediction))
-        #print('Max prediction values:',numpy.amax(prediction))
-    return coords[0], coords[1]
+        width, height = resolution
+        x = width/2
+        y = height/2
+
+    return x,y
 
 def prediction_to_coords(resolution, layer, roi=60):
-    px, py = prediction_to_pixel_coords(layer)
+    px, py = prediction_to_pixel_coords(resolution, layer)
+    # px och py är pixelkoordinater som inte är avrundade.
 
     # Convert from pixel coordinate system to vehicle relative system
     width, height = resolution
+    # gör om till relativa koordinater (i meter)
     x = (px-(width/2))/(width/roi)
-    y = (py-(height/2))/(height/roi)
+    y = -(py-(height/2))/(height/roi)
     return [x,y]
 
 def make_circle(width, height, x, y, radius, roi):
@@ -571,7 +586,7 @@ def make_circle(width, height, x, y, radius, roi):
     arr = numpy.zeros((width,height))
     # beräkna vilken pixel det motsvarar
     px = round(width/2 + x*(width/roi))
-    py = round(height/2 + y*(height/roi))
+    py = round(height/2 - y*(height/roi))
     # draw circle with numpy
     rows,cols = draw.circle(py,px,radius=radius,shape=(width,height)) # py before px as it takes the arguments rows,cols.
     arr[rows,cols] = 1
@@ -659,6 +674,11 @@ def write_info_file():
         file.write(info)
         file.close()
 
+def write_test_loss_file(class_loss, mse_loss):
+    loss_txt = 'Class loss: %.5f \n MSE loss: %.5f' %(class_loss, mse_loss)
+    file = open(PATH_SAVE + "test_loss.txt", "w")
+    file.write(loss_txt)
+    file.close()
+
 if __name__ == '__main__':
     main()
-
