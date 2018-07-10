@@ -197,7 +197,7 @@ class PCNet(nn.Module):
         y = torch.cat((l,v),1)                              # 10330
         y = F.elu(self.linear_d2(y))                          # 800
         y = F.elu(self.linear_d3(y))                          # 256
-        y = F.elu(self.linear_d4(y))                          # n_pc
+        y = self.linear_d4(y)                          # n_pc
 
         return y
 

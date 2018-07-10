@@ -446,7 +446,7 @@ def train(model, batch, loss_fn, coeffs, means, optimizer, n_pc):
 
     # Go from principal components to original projection
     # [batch_size, n_pc] * [n_pc, 60] = [batch_size, 60]
-    predicted_trajectory = torch.mm(pc,coeffs.transpose(0,1)) + means
+    predicted_trajectory = torch.mm(pc, coeffs.transpose(0,1)) + means
 
     # Compute loss
     loss = loss_fn(predicted_trajectory, targets)
