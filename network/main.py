@@ -164,6 +164,7 @@ def main():
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
+        print('Number of parameters: %i'%get_n_params(model))
 
         # define loss function and optimizer
         print("-----Creating lossfunction and optimizer-----")

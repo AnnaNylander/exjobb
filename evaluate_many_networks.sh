@@ -134,25 +134,8 @@ echo "*** Evaluating network on test set in order to generate predictions ***"
 #--evaluate
 
 #-------------------------------------------------------------------------------
-echo "*** regression_idea/more_layers_1_continued***"
-FOLDER_NAME=test_deluxe/regression_idea/more_layers_1_continued/
-NETWORK_FILE=more_layers_1
-NETWORK_CLASS=CNNBiasAll
 
-#python3 network/main.py \
-#-e $EPOCHS \
-#-b $BATCH_SIZE \
-#-pl $PLOT_FREQ \
-#-p $PRINT_FREQ \
-#-a ${NETWORK_FILE}.${NETWORK_CLASS} \
-#-d $DATASET \
-#-s ${FOLDER_NAME} \
-#-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
-#-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
-#--resume ${FOLDER_NAME}all_time_best.pt \
-#--evaluate
-
-python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATASET}test/
+#python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATASET}test/
 
 #-------------------------------------------------------------------------------
 #echo "*** regression_idea/more_layers_2***"
@@ -274,10 +257,9 @@ python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATAS
 #-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
 #--resume ${FOLDER_NAME}all_time_best.pt \
 #--evaluate
-
 #-------------------------------------------------------------------------------
-#echo "*** cluster_idea/cluster_1_20_cl_7_pc***"
-#FOLDER_NAME=test_deluxe/cluster_idea/cluster_1_20_cl_7_pc/
+#echo "*** cluster_idea/cluster_1_20_cl_7_pc_continued***"
+#FOLDER_NAME=test_deluxe/cluster_idea/cluster_1_20_cl_7_pc_continued/
 #NETWORK_FILE=cluster_1
 #NETWORK_CLASS=ClusterNet
 
@@ -297,29 +279,7 @@ python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATAS
 #--resume ${FOLDER_NAME}all_time_best.pt \
 #--evaluate
 
-#-------------------------------------------------------------------------------
-echo "*** cluster_idea/cluster_1_20_cl_7_pc_continued***"
-FOLDER_NAME=test_deluxe/cluster_idea/cluster_1_20_cl_7_pc_continued/
-NETWORK_FILE=cluster_1
-NETWORK_CLASS=ClusterNet
-
-#python3 network/main_clusters.py \
-#-ncl 20 \
-#-npc 7 \
-#-cpath ${CLUSTER_PATH}20_clusters/ \
-#-e $EPOCHS \
-#-b $BATCH_SIZE \
-#-pl $PLOT_FREQ \
-#-p $PRINT_FREQ \
-#-a ${NETWORK_FILE}.${NETWORK_CLASS} \
-#-d $DATASET \
-#-s ${FOLDER_NAME} \
-#-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
-#-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
-#--resume ${FOLDER_NAME}all_time_best.pt \
-#--evaluate
-
-python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATASET}test/
+#python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATASET}test/
 
 #-------------------------------------------------------------------------------
 #echo "*** cluster_idea/cluster_1_100_cl_7_pc***"
@@ -342,19 +302,16 @@ python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATAS
 #-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
 #--resume ${FOLDER_NAME}all_time_best.pt \
 #--evaluate
-
 ################################################################################
-# PCA IDEA
-################################################################################
-#-------------------------------------------------------------------------------
-echo "*** pca_idea/pc_reg_1_with_5_pc***"
-FOLDER_NAME=test_deluxe/pca_idea/pc_reg_1_with_5_pc/
-NETWORK_FILE=pc_reg_1
-NETWORK_CLASS=PCNet
+#echo "*** cluster_idea/cluster_1_100_cl_7_pc_continued***"
+#FOLDER_NAME=test_deluxe/cluster_idea/cluster_1_100_cl_7_pc_continued/
+#NETWORK_FILE=cluster_1
+#NETWORK_CLASS=ClusterNet
 
-#python3 network/main_pc_reg.py \
-#-npc 5 \
-#-cpath ${CLUSTER_PATH}20_clusters/ \
+#python3 network/main_clusters.py \
+#-ncl 100 \
+#-npc 7 \
+#-cpath ${CLUSTER_PATH}100_clusters/ \
 #-e $EPOCHS \
 #-b $BATCH_SIZE \
 #-pl $PLOT_FREQ \
@@ -367,10 +324,31 @@ NETWORK_CLASS=PCNet
 #--resume ${FOLDER_NAME}all_time_best.pt \
 #--evaluate
 
-python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATASET}test/
+################################################################################
+# PCA IDEA
+################################################################################
+#echo "*** pca_idea/pc_reg_1_fixed_5_pc***"
+#FOLDER_NAME=test_deluxe/pca_idea/pc_reg_1_fixed_5_pc/
+#NETWORK_FILE=pc_reg_1
+#NETWORK_CLASS=PCNet
 
-#echo "*** pca_idea/pc_reg_1_with_7_pc***"
-#FOLDER_NAME=test_deluxe/pca_idea/pc_reg_1_with_7_pc/
+#python3 network/main_pc_reg.py \
+#-npc 5 \
+#-cpath ${CLUSTER_PATH}20_clusters/ \
+#-e $EPOCHS \
+#-b $BATCH_SIZE \
+#-pl $PLOT_FREQ \
+#-p $PRINT_FREQ \
+#-a ${NETWORK_FILE}.${NETWORK_CLASS} \
+#-d $DATASET \
+#s ${FOLDER_NAME} \
+#-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+#-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+#--resume ${FOLDER_NAME}all_time_best.pt \
+#--evaluate
+################################################################################
+#echo "*** pca_idea/pc_reg_1_fixed_7_pc***"
+#FOLDER_NAME=test_deluxe/pca_idea/pc_reg_1_fixed_7_pc/
 #NETWORK_FILE=pc_reg_1
 #NETWORK_CLASS=PCNet
 
@@ -388,14 +366,14 @@ python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATAS
 #-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
 #--resume ${FOLDER_NAME}all_time_best.pt \
 #--evaluate
-
-#echo "*** pca_idea/pc_reg_1_with_20_pc***"
-#FOLDER_NAME=test_deluxe/pca_idea/pc_reg_1_with_20_pc/
+################################################################################
+#echo "*** pca_idea/pc_reg_1_fixed_10_pc***"
+#FOLDER_NAME=test_deluxe/pca_idea/pc_reg_1_fixed_10_pc/
 #NETWORK_FILE=pc_reg_1
 #NETWORK_CLASS=PCNet
 
 #python3 network/main_pc_reg.py \
-#-npc 20 \
+#-npc 10 \
 #-cpath ${CLUSTER_PATH}20_clusters/ \
 #-e $EPOCHS \
 #-b $BATCH_SIZE \
@@ -406,5 +384,107 @@ python3 save_visualization.py --prediction -m ${FOLDER_NAME} -r test/ -d ${DATAS
 #-s ${FOLDER_NAME} \
 #-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
 #-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+#--resume ${FOLDER_NAME}all_time_best.pt \
+#--evaluate
+################################################################################
+#echo "*** pca_idea/pc_reg_1_fixed_5_pc_continued***"
+#FOLDER_NAME=test_deluxe/pca_idea/pc_reg_1_fixed_5_pc_continued/
+#NETWORK_FILE=pc_reg_1
+#NETWORK_CLASS=PCNet
+
+#python3 network/main_pc_reg.py \
+#-npc 5 \
+#-cpath ${CLUSTER_PATH}20_clusters/ \
+#-e $EPOCHS \
+#-b $BATCH_SIZE \
+#-pl $PLOT_FREQ \
+#-p $PRINT_FREQ \
+#-a ${NETWORK_FILE}.${NETWORK_CLASS} \
+#-d $DATASET \
+#-s ${FOLDER_NAME} \
+#-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+#-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+#--resume ${FOLDER_NAME}all_time_best.pt \
+#--evaluate
+################################################################################
+echo "*** pca_idea/pc_reg_1_fixed_20_pc***"
+FOLDER_NAME=test_loss_before_continue/pc_reg_1_fixed_20_pc/
+NETWORK_FILE=pc_reg_1
+NETWORK_CLASS=PCNet
+
+python3 network/main_pc_reg.py \
+-npc 20 \
+-cpath ${CLUSTER_PATH}20_clusters/ \
+-e $EPOCHS \
+-b $BATCH_SIZE \
+-pl $PLOT_FREQ \
+-p $PRINT_FREQ \
+-a ${NETWORK_FILE}.${NETWORK_CLASS} \
+-d $DATASET \
+-s ${FOLDER_NAME} \
+-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+-off '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+--resume ${FOLDER_NAME}all_time_best.pt \
+--evaluate
+################################################################################
+# SEMSEG IDEA
+################################################################################
+echo "*** semseg/semseg_6_s_6_r***"
+FOLDER_NAME=test_deluxe/semseg/semseg_6_s_6_r/
+NETWORK_FILE=semseg
+NETWORK_CLASS=Network
+
+python3 network/main_semseg.py \
+-e 10 \
+-b 12 \
+-pl $PLOT_FREQ \
+-a ${NETWORK_FILE}.${NETWORK_CLASS} \
+-p $PRINT_FREQ \
+-d $DATASET \
+-s ${FOLDER_NAME} \
+-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+-off '5 10 15 20 25 30' \
+-res 150 150 \
+-r 3.0 \
+--resume ${FOLDER_NAME}all_time_best.pt \
+--evaluate
+################################################################################
+echo "*** semseg/semseg_6_s_4_r***"
+FOLDER_NAME=test_deluxe/semseg/semseg_6_s_4_r/
+NETWORK_FILE=semseg
+NETWORK_CLASS=Network
+
+python3 network/main_semseg.py \
+-e 10 \
+-b 12 \
+-pl $PLOT_FREQ \
+-a ${NETWORK_FILE}.${NETWORK_CLASS} \
+-p $PRINT_FREQ \
+-d $DATASET \
+-s ${FOLDER_NAME} \
+-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+-off '5 10 15 20 25 30' \
+-res 150 150 \
+-r 4.0 \
+--resume ${FOLDER_NAME}all_time_best.pt \
+--evaluate
+################################################################################
+#echo "*** semseg/semseg_6_s_10_r_continued***"
+#FOLDER_NAME=test_deluxe/semseg/semseg_6_s_10_r_continued/
+#NETWORK_FILE=semseg
+#NETWORK_CLASS=Network
+
+#python3 network/main_semseg.py \
+#-e 10 \
+#-b 12 \
+#-pl $PLOT_FREQ \
+#-a ${NETWORK_FILE}.${NETWORK_CLASS} \
+#-p $PRINT_FREQ \
+#-d $DATASET \
+#-s ${FOLDER_NAME} \
+#-ipf '1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30' \
+#-off '5 10 15 20 25 30' \
+#-res 150 150 \
+#-r 4.0 \
 #--resume ${FOLDER_NAME}all_time_best.pt \
 #--evaluate

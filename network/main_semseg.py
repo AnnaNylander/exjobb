@@ -159,7 +159,7 @@ def main():
     print("-----Loading datasets-----")
     if not args.evaluate:
         dataloader_train = get_data_loader(PATH_DATA + 'train/', shuffle=args.shuffle, balance=args.balance, sampler_max= None)
-        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False, sampler_max= 1000)
+        dataloader_val = get_data_loader(PATH_DATA + 'validate/', shuffle=False, balance=False, sampler_max= None)
     dataloader_test = get_data_loader(PATH_DATA + 'test/', shuffle = False, balance=False, sampler_max= None)
 
     # create new model and lossfunctions and stuff
@@ -243,7 +243,7 @@ def main():
     # Final evaluation on test dataset
     if args.evaluate:
         print("_____EVALUATE MODEL______")
-        test_class_loss, test_MSE_loss = validate(model, dataloader_test, loss_fn, MSE_loss_fn, True)
+        test_class_loss, test_MSE_loss = validate(model, dataloader_test, loss_fn, MSE_loss_fn, save_output=False) # NOTE set to true to generate predictions
         print("Test loss: %f" %test_MSE_loss)
         write_test_loss_file(test_class_loss, test_MSE_loss)
 

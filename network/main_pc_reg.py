@@ -166,6 +166,7 @@ def main():
         model = eval(args.arch + '(' + model_arg_string + ')')
         model.cuda()
         print('Model size: %iMB' %(2*get_n_params(model)*4/(1024**2)))
+        print('Number of parameters: %i'%get_n_params(model))
 
         # define loss function and optimizer
         print("-----Creating lossfunction and optimizer-----")
@@ -232,6 +233,7 @@ def main():
         coeffs, means = get_pca_values(args.pc_path, args.n_pc)
         test_loss = validate(model, dataloader_test, loss_fn, coeffs, means, args.n_pc, True)
         print("Test loss: %f" %test_loss)
+        write_test_loss_file(test_loss)
 
 def get_pca_values(cluster_path, n_pc):
     # Load principal component coefficient (or factor loadings) matrix
